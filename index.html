@@ -1,0 +1,375 @@
+  <style>
+/* Linkbygger - bygger links til msf.dk med faste UTM-koder */
+:root {
+  color-scheme: light;
+  --paper: #FFFFFF;
+  --ink: rgba(0, 0, 0, .9);
+  --soft: rgba(0, 0, 0, .38);
+  --hair: rgba(0, 0, 0, .12);
+  --red: #EE0000;
+  --f: "Geist", "Neue Haas Grotesk Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --f-mono: "Geist Mono", ui-monospace, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--paper); }
+body { margin: 0; color: var(--ink); font: 400 20px/1.3 var(--f); letter-spacing: -.01em; padding-inline: clamp(16px, 3vw, 40px); padding-block: 22px; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; letter-spacing: inherit; }
+
+.top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 20px; }
+.top .name { display: flex; gap: .35em; align-items: baseline; }
+.top .meta { color: var(--soft); }
+.top .meta button:hover { color: var(--ink); }
+
+html, body { height: 100%; }
+body { display: flex; flex-direction: column; }
+.module { margin: auto; padding-block: 40px; width: 100%; max-width: 760px; display: grid; gap: clamp(28px, 5vh, 48px); }
+.stage { display: grid; gap: clamp(24px, 4vh, 36px); }
+.trail { display: flex; flex-wrap: wrap; gap: 0 .6em; color: var(--soft); font-size: 20px; }
+.trail:empty { display: none; }
+.trail button:hover { color: var(--ink); }
+.trail span.sep { color: var(--hair); }
+
+h1 { margin: 0; font-weight: 500; font-size: clamp(34px, 5vw, 60px); line-height: 1.05; letter-spacing: -.025em; text-wrap: balance; max-width: 20ch; }
+.sub { margin: 0; color: var(--soft); max-width: 48ch; }
+
+.list { border-top: 1px solid var(--hair); }
+.opt { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px; width: 100%;
+  border-bottom: 1px solid var(--hair); padding: 18px 12px; transition: background .12s ease-in-out; }
+.opt .t { font-size: clamp(22px, 2.6vw, 30px); line-height: 1.15; letter-spacing: -.015em; font-weight: 500; }
+.opt .d { color: var(--soft); font-size: 17px; text-align: right; }
+.opt:hover, .opt:focus-visible { background: rgba(0, 0, 0, .035); }
+.opt.new .t { color: var(--soft); }
+
+.form { display: grid; gap: 28px; max-width: 900px; }
+.field { display: grid; gap: 6px; }
+.field label { color: var(--soft); font-size: 18px; }
+.field input { width: 100%; border: 0; border-bottom: 1px solid var(--ink); background: transparent; color: var(--ink);
+  font: 400 clamp(20px, 2.2vw, 26px)/1.3 var(--f); letter-spacing: -.01em; padding: 6px 0 10px; border-radius: 0; }
+.field input::placeholder { color: rgba(0,0,0,.2); }
+.field input:focus { outline: none; border-bottom-color: var(--red); }
+.note { margin: 0; color: var(--soft); font-size: 18px; }
+.note b { font: 400 17px var(--f-mono); color: var(--ink); letter-spacing: 0; }
+.err { margin: 0; color: var(--red); font-size: 18px; }
+
+.go { font-size: 18px; font-weight: 500; letter-spacing: 0; line-height: 1; justify-self: start;
+  background: var(--ink); color: var(--paper); border-radius: 999px; padding: 15px 26px; transition: background .15s; }
+.go:hover { background: var(--red); }
+.go:disabled { background: rgba(0,0,0,.12); color: var(--soft); cursor: default; }
+
+.linkout { font: 400 clamp(16px, 1.6vw, 20px)/1.6 var(--f-mono); letter-spacing: -.01em; word-break: break-all; margin: 0; max-width: 1100px; }
+.linkout .k { color: var(--soft); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px 40px; align-items: baseline; }
+.actions .go.small, .small { font-size: 20px; letter-spacing: -.01em; font-weight: 400; }
+.small { color: var(--soft); }
+.small:hover { color: var(--ink); }
+.ok { color: var(--red); font-size: 20px; }
+
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px 48px; border-top: 1px solid var(--hair); padding-top: 20px; max-width: 1100px; }
+.cols h2 { margin: 0 0 8px; font: 400 18px var(--f); color: var(--soft); letter-spacing: -.01em; }
+.parts { display: grid; grid-template-columns: max-content 1fr; gap: 2px 20px; margin: 0; font: 15px/1.6 var(--f-mono); letter-spacing: 0; }
+.parts dt { color: var(--soft); }
+.parts dd { margin: 0; word-break: break-all; }
+.adscode { font: 15px/1.6 var(--f-mono); letter-spacing: 0; word-break: break-all; margin: 8px 0 0; }
+
+.back { color: var(--soft); font-size: 20px; justify-self: start; }
+.back:hover { color: var(--ink); }
+
+button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outline-offset: 4px; }
+@media (prefers-reduced-motion: no-preference) {
+  .enter h1 { animation: rise .35s cubic-bezier(.2,.7,.2,1); }
+  .enter .list, .enter .form, .enter .linkout { animation: rise .45s cubic-bezier(.2,.7,.2,1); }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+}
+@media (max-width: 560px) {
+  .opt { grid-template-columns: 1fr auto; gap: 2px 12px; }
+  .opt .d { grid-column: 1; grid-row: 2; text-align: left; font-size: 15px; }
+  .top, .trail, .back, .small, .ok { font-size: 17px; }
+}
+  </style>
+</head>
+<body>
+  <div class="module">
+    <header class="top">
+      <div class="name">Linkbygger</div>
+      <div class="meta" id="meta"></div>
+    </header>
+    <main class="stage" id="stage" aria-live="polite"></main>
+  </div>
+<script>
+(function () {
+  var CHANNELS = [
+    { v: "facebook", t: "Facebook", d: "Opslag, story, annonce", social: true },
+    { v: "instagram", t: "Instagram", d: "Opslag, story, reel, bio", social: true },
+    { v: "linkedin", t: "LinkedIn", d: "Opslag, annonce", social: true },
+    { v: "newsletter", t: "Nyhedsbrev", d: "Mail", medium: "email" },
+    { v: "outdoor", t: "Plakat og print", d: "QR-kode, trykt link", medium: "print" },
+    { v: "msf-web", t: "msf.dk", d: "Banner, popup", medium: "internal" }
+  ];
+  var FORMATS = {
+    organic: [
+      { v: "post", t: "Opslag" }, { v: "story", t: "Story" }, { v: "reel", t: "Reel" },
+      { v: "video", t: "Video" }, { v: "link_in_bio", t: "Link i bio", d: "Linket på profilen" }
+    ],
+    paid: [
+      { v: "video", t: "Video" }, { v: "image", t: "Billede" },
+      { v: "leadcard", t: "Lead-annonce", d: "Formular i Meta" }, { v: "carousel", t: "Karrusel" }
+    ],
+    email: [{ v: "nyhedsbrev", t: "Nyhedsbrev" }, { v: "mail", t: "Enkelt mail" }],
+    print: [{ v: "plakat", t: "Plakat" }, { v: "flyer", t: "Flyer" }],
+    internal: [{ v: "banner", t: "Banner" }, { v: "popup", t: "Popup" }]
+  };
+  var CAMPAIGNS = [
+    { v: "evergreen", t: "Nej", d: "Almindeligt indhold" }
+  ];
+
+  var s = fresh();
+  function fresh() { return { channel: null, paid: null, format: null, campaign: null, campNew: "", codeOne: "", codeFp: "", url: "", topic: "", step: 0 }; }
+  function digits(x) { return (x || "").replace(/\D/g, ""); }
+  function isAd() { return isSocial() && s.paid === true; }
+  var $ = function (id) { return document.getElementById(id); };
+
+  function clean(x) {
+    return (x || "").toLowerCase().trim()
+      .replace(/æ/g, "ae").replace(/ø/g, "oe").replace(/å/g, "aa")
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9_-]+/g, "_").replace(/_+/g, "_").replace(/^[_-]+|[_-]+$/g, "");
+  }
+  function ch() { return CHANNELS.filter(function (c) { return c.v === s.channel; })[0]; }
+  function isSocial() { var c = ch(); return !!(c && c.social); }
+  function medium() { var c = ch(); if (!c) return null; return c.social ? (s.paid ? "paid-social" : "organic") : c.medium; }
+  function formats() { var c = ch(); if (!c) return []; if (c.social) return s.paid ? FORMATS.paid : FORMATS.organic; return FORMATS[c.medium]; }
+  function campaign() { return s.campaign === "__new" ? clean(s.campNew) : s.campaign; }
+  function content() { var t = clean(s.topic); return s.format ? (t ? s.format + "_" + t : s.format) : null; }
+
+  function steps() {
+    var l = ["channel"];
+    if (!s.channel || isSocial()) l.push("paid");
+    l.push("format", "campaign");
+    if (isAd()) l.push("codes");
+    l.push("url", "done");
+    return l;
+  }
+  function cur() { return steps()[s.step]; }
+  function go(i) { s.step = Math.max(0, Math.min(i, steps().length - 1)); draw(true); window.scrollTo({ top: 0 }); }
+  function next() { go(s.step + 1); }
+
+  function parseUrl(raw) {
+    raw = (raw || "").trim();
+    if (!raw) return { url: null, err: "" };
+    if (!/^https?:\/\//i.test(raw)) raw = "https://" + raw;
+    try {
+      var u = new URL(raw);
+      if (!/(^|\.)msf\.dk$/i.test(u.hostname)) return { url: null, err: "Linket skal gå til msf.dk." };
+      u.protocol = "https:";
+      return { url: u, err: "" };
+    } catch (e) { return { url: null, err: "Det ligner ikke en webadresse. Kopiér hele adressen fra browseren." }; }
+  }
+
+  function h(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function opt(item, selected, onPick, extra) {
+    var b = h("button", "opt" + (selected ? " sel" : "") + (extra ? " " + extra : "")); b.type = "button";
+    b.appendChild(h("span", "t", item.t));
+    b.appendChild(h("span", "d", item.d || ""));
+    b.addEventListener("click", onPick);
+    return b;
+  }
+  function label(key) {
+    if (key === "channel") return ch().t;
+    if (key === "paid") return s.paid ? "Annonce" : "Organisk";
+    if (key === "format") { var f = formats().filter(function (x) { return x.v === s.format; })[0]; return f ? f.t : ""; }
+    if (key === "campaign") return s.campaign === "evergreen" ? "Ingen kampagne" : campaign();
+    if (key === "codes") {
+      var c = [];
+      if (digits(s.codeOne)) c.push("One-off " + digits(s.codeOne));
+      if (digits(s.codeFp)) c.push("Feltpartner " + digits(s.codeFp));
+      return c.length ? c.join(", ") : "Ingen koder";
+    }
+    return "";
+  }
+
+  function draw(animate) {
+    var st = cur(), all = steps(), total = all.length - 1;
+    var stage = $("stage"); stage.innerHTML = "";
+    stage.classList.remove("enter"); if (animate) { void stage.offsetWidth; stage.classList.add("enter"); }
+
+    var meta = $("meta"); meta.innerHTML = "";
+    if (st === "done") meta.textContent = "Færdig";
+    else meta.textContent = (s.step + 1) + " / " + total;
+
+    var trail = h("nav", "trail"); trail.setAttribute("aria-label", "Dine valg");
+    all.forEach(function (key, i) {
+      if (i >= s.step || key === "url" || key === "done") return;
+      if (trail.childNodes.length) trail.appendChild(h("span", "sep", "/"));
+      var b = h("button", null, label(key)); b.type = "button"; b.setAttribute("aria-label", "Ret: " + label(key));
+      b.addEventListener("click", function () { go(i); });
+      trail.appendChild(b);
+    });
+    stage.appendChild(trail);
+
+    if (st === "channel") {
+      stage.appendChild(h("h1", null, "Hvor skal linket deles?"));
+      var l = h("div", "list");
+      CHANNELS.forEach(function (c) {
+        l.appendChild(opt(c, s.channel === c.v, function () { if (s.channel !== c.v) { s.channel = c.v; s.paid = null; s.format = null; } next(); }));
+      });
+      stage.appendChild(l);
+    }
+
+    if (st === "paid") {
+      stage.appendChild(h("h1", null, "Betaler vi for at vise det?"));
+      var l2 = h("div", "list");
+      l2.appendChild(opt({ t: "Nej", d: "Almindeligt opslag" }, s.paid === false, function () { if (s.paid !== false) s.format = null; s.paid = false; next(); }));
+      l2.appendChild(opt({ t: "Ja", d: "Annonce eller boost" }, s.paid === true, function () { if (s.paid !== true) s.format = null; s.paid = true; next(); }));
+      stage.appendChild(l2);
+    }
+
+    if (st === "format") {
+      stage.appendChild(h("h1", null, "Hvad slags " + (isSocial() ? (s.paid ? "annonce" : "opslag") : "indhold") + "?"));
+      var l3 = h("div", "list");
+      formats().forEach(function (f) { l3.appendChild(opt(f, s.format === f.v, function () { s.format = f.v; next(); })); });
+      stage.appendChild(l3);
+    }
+
+    if (st === "campaign") {
+      stage.appendChild(h("h1", null, "Hører det til en kampagne?"));
+      stage.appendChild(h("p", "sub", "Samme kampagne i alle kanaler, så den kan ses samlet."));
+      var l4 = h("div", "list");
+      CAMPAIGNS.forEach(function (c) { l4.appendChild(opt(c, s.campaign === c.v, function () { s.campaign = c.v; next(); })); });
+      l4.appendChild(opt({ t: "Ny kampagne", d: "Skriv et navn" }, s.campaign === "__new", function () {
+        s.campaign = "__new"; draw(false); var i = $("campNew"); if (i) i.focus();
+      }, "new"));
+      stage.appendChild(l4);
+      if (s.campaign === "__new") {
+        var fm = h("div", "form");
+        var f = h("div", "field");
+        var lb = h("label", null, "Kampagnens navn"); lb.htmlFor = "campNew";
+        var inp = document.createElement("input"); inp.id = "campNew"; inp.type = "text"; inp.placeholder = "Julegave 2026"; inp.autocomplete = "off"; inp.value = s.campNew;
+        var note = h("p", "note");
+        var btn = h("button", "go", "Videre"); btn.type = "button";
+        function upd() {
+          var c = clean(inp.value);
+          note.innerHTML = c ? "Bliver til <b></b>" : "Kort navn med år, f.eks. <b></b>";
+          note.querySelector("b").textContent = c || "julegave26";
+          btn.disabled = !c;
+        }
+        inp.addEventListener("input", function () { s.campNew = inp.value; upd(); });
+        inp.addEventListener("keydown", function (e) { if (e.key === "Enter" && clean(inp.value)) next(); });
+        btn.addEventListener("click", next);
+        f.appendChild(lb); f.appendChild(inp); f.appendChild(note);
+        fm.appendChild(f); fm.appendChild(btn);
+        stage.appendChild(fm); upd();
+      }
+    }
+
+    if (st === "codes") {
+      stage.appendChild(h("h1", null, "Kampagnekoder"));
+      stage.appendChild(h("p", "sub", "Koderne fra OnlineFundraising, så donationen lander på den rigtige kampagne. Udfyld én, begge eller ingen."));
+      var fm3 = h("div", "form");
+      function codeField(id, text, key, ph) {
+        var fd = h("div", "field");
+        var lbl = h("label", null, text); lbl.htmlFor = id;
+        var ci = document.createElement("input"); ci.id = id; ci.type = "text"; ci.inputMode = "numeric"; ci.autocomplete = "off"; ci.placeholder = ph; ci.value = s[key];
+        ci.addEventListener("input", function () { var d = digits(ci.value); if (d !== ci.value) ci.value = d; s[key] = d; });
+        ci.addEventListener("keydown", function (e) { if (e.key === "Enter") next(); });
+        fd.appendChild(lbl); fd.appendChild(ci);
+        return fd;
+      }
+      fm3.appendChild(codeField("codeOne", "Kampagnekode One-off", "codeOne", "f.eks. 955"));
+      fm3.appendChild(codeField("codeFp", "Kampagnekode Feltpartner", "codeFp", "f.eks. 3391"));
+      var nx = h("button", "go", "Videre"); nx.type = "button";
+      nx.addEventListener("click", next);
+      fm3.appendChild(nx);
+      stage.appendChild(fm3);
+      setTimeout(function () { var i = $("codeOne"); if (i) i.focus(); }, 0);
+    }
+
+    if (st === "url") {
+      stage.appendChild(h("h1", null, "Hvor skal folk lande?"));
+      var fm2 = h("div", "form");
+      var f1 = h("div", "field");
+      var ul = h("label", null, "Side på msf.dk — kopiér adressen fra browseren"); ul.htmlFor = "url";
+      var u = document.createElement("input"); u.id = "url"; u.type = "url"; u.placeholder = "msf.dk/stoet"; u.autocomplete = "off"; u.spellcheck = false; u.value = s.url;
+      var err = h("p", "err"); err.hidden = true;
+      f1.appendChild(ul); f1.appendChild(u); f1.appendChild(err);
+      var f2 = h("div", "field");
+      var tl = h("label", null, "Emne, valgfrit"); tl.htmlFor = "topic";
+      var t = document.createElement("input"); t.id = "topic"; t.type = "text"; t.placeholder = "Sudan"; t.autocomplete = "off"; t.value = s.topic;
+      f2.appendChild(tl); f2.appendChild(t);
+      var mk = h("button", "go", "Lav link"); mk.type = "button";
+      function check() { var p = parseUrl(u.value); err.hidden = !p.err; err.textContent = p.err; mk.disabled = !p.url; }
+      u.addEventListener("input", function () { s.url = u.value; check(); });
+      t.addEventListener("input", function () { s.topic = t.value; });
+      [u, t].forEach(function (el) { el.addEventListener("keydown", function (e) { if (e.key === "Enter" && !mk.disabled) next(); }); });
+      mk.addEventListener("click", next);
+      fm2.appendChild(f1); fm2.appendChild(f2); fm2.appendChild(mk);
+      stage.appendChild(fm2);
+      check();
+      setTimeout(function () { u.focus(); }, 0);
+    }
+
+    if (st === "done") {
+      var p = parseUrl(s.url).url;
+      var vals = { utm_source: s.channel, utm_medium: medium(), utm_campaign: campaign(), utm_content: content() };
+      var codes = {};
+      if (isAd() && digits(s.codeOne)) codes.campaign_code = digits(s.codeOne);
+      if (isAd() && digits(s.codeFp)) codes.campaign_code_recurring = digits(s.codeFp);
+      Object.keys(codes).forEach(function (k) { p.searchParams.set(k, codes[k]); });
+      Object.keys(vals).forEach(function (k) { p.searchParams.set(k, vals[k]); });
+      Object.keys(codes).forEach(function (k) { vals[k] = codes[k]; });
+      var href = p.toString();
+
+      stage.appendChild(h("h1", null, "Dit link er klar."));
+      var link = h("p", "linkout");
+      var q = href.indexOf("?");
+      link.appendChild(document.createTextNode(href.slice(0, q + 1)));
+      href.slice(q + 1).split("&").forEach(function (pair, i) {
+        if (i) link.appendChild(h("span", "k", "&"));
+        var eq = pair.indexOf("=");
+        link.appendChild(h("span", "k", pair.slice(0, eq + 1)));
+        link.appendChild(document.createTextNode(pair.slice(eq + 1)));
+      });
+      stage.appendChild(link);
+
+      var acts = h("div", "actions");
+      var cp = h("button", "go", "Kopiér"); cp.type = "button";
+      var ok = h("span", "ok", "");
+      cp.addEventListener("click", function () {
+        var fallback = function () {
+          var r = document.createRange(); r.selectNodeContents(link);
+          var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+          ok.textContent = "Markeret — tryk Ctrl+C";
+        };
+        try { navigator.clipboard.writeText(href).then(function () { ok.textContent = "Kopieret"; }, fallback); } catch (e) { fallback(); }
+      });
+      var same = h("button", "small", "Samme kampagne, ny kanal"); same.type = "button";
+      same.addEventListener("click", function () { var keep = { campaign: s.campaign, campNew: s.campNew, codeOne: s.codeOne, codeFp: s.codeFp, url: s.url, topic: s.topic }; s = fresh(); Object.assign(s, keep); draw(true); });
+      var nw = h("button", "small", "Start forfra"); nw.type = "button";
+      nw.addEventListener("click", function () { s = fresh(); draw(true); });
+      acts.appendChild(cp); acts.appendChild(ok); acts.appendChild(same); acts.appendChild(nw);
+      stage.appendChild(acts);
+
+      var cols = h("div", "cols");
+      var c1 = h("div"); c1.appendChild(h("h2", null, "Koderne"));
+      var dl = h("dl", "parts");
+      Object.keys(vals).forEach(function (k) { dl.appendChild(h("dt", null, k)); dl.appendChild(h("dd", null, vals[k])); });
+      c1.appendChild(dl); cols.appendChild(c1);
+      if (isSocial() && s.paid) {
+        var c2 = h("div"); c2.appendChild(h("h2", null, "Annonce i Ads Manager? Sæt dette under URL-parametre"));
+        var adsParams = "utm_source=" + s.channel + "&utm_medium=paid-social&utm_campaign=" + campaign() + "&utm_content={{ad.name}}";
+        Object.keys(codes).forEach(function (k) { adsParams += "&" + k + "=" + codes[k]; });
+        c2.appendChild(h("p", "adscode", adsParams));
+        cols.appendChild(c2);
+      }
+      stage.appendChild(cols);
+    }
+
+    if (s.step > 0) {
+      var back = h("button", "back", "Tilbage"); back.type = "button";
+      back.addEventListener("click", function () { go(s.step - 1); });
+      stage.appendChild(back);
+    }
+  }
+
+  draw(false);
+})();
+</script>

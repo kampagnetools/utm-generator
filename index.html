@@ -1,3 +1,5 @@
+<!doctype html>
+<html lang="da">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -45,7 +47,7 @@ h1 { margin: 0; font-weight: 500; font-size: clamp(34px, 5vw, 60px); line-height
 .opt { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px; width: 100%;
   border-bottom: 1px solid var(--hair); padding: 18px 12px; transition: background .12s ease-in-out; }
 .opt .t { font-size: clamp(22px, 2.6vw, 30px); line-height: 1.15; letter-spacing: -.015em; font-weight: 500; }
-.opt .d { color: var(--soft); font-size: 17px; text-align: right; }
+.opt .d { color: rgba(0, 0, 0, .62); font-size: 18px; text-align: right; }
 .opt:hover, .opt:focus-visible { background: rgba(0, 0, 0, .035); }
 .opt.new .t { color: var(--soft); }
 
@@ -91,7 +93,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
 }
 @media (max-width: 560px) {
   .opt { grid-template-columns: 1fr auto; gap: 2px 12px; }
-  .opt .d { grid-column: 1; grid-row: 2; text-align: left; font-size: 15px; }
+  .opt .d { grid-column: 1; grid-row: 2; text-align: left; font-size: 16px; }
   .top, .trail, .back, .small, .ok { font-size: 17px; }
 }
   </style>
@@ -128,7 +130,8 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     internal: [{ v: "banner", t: "Banner" }, { v: "popup", t: "Popup" }]
   };
   var CAMPAIGNS = [
-    { v: "evergreen", t: "Nej", d: "Almindeligt indhold" }
+    { v: "evergreen", t: "Nej", d: "Almindeligt indhold" },
+    { v: "eoy2027", t: "End of Year 2027", d: "eoy2027" }
   ];
 
   var s = fresh();
@@ -382,3 +385,5 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   draw(false);
 })();
 </script>
+</body>
+</html>

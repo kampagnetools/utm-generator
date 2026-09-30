@@ -1,3 +1,12 @@
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Linkbygger</title>
+  <meta name="description" content="Byg links til msf.dk med faste UTM-koder.">
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400&display=swap">
   <style>
 /* Linkbygger - bygger links til msf.dk med faste UTM-koder */
 :root {
@@ -268,8 +277,8 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       function codeField(id, text, key, ph) {
         var fd = h("div", "field");
         var lbl = h("label", null, text); lbl.htmlFor = id;
-        var ci = document.createElement("input"); ci.id = id; ci.type = "text"; ci.inputMode = "numeric"; ci.autocomplete = "off"; ci.placeholder = ph; ci.value = s[key];
-        ci.addEventListener("input", function () { var d = digits(ci.value); if (d !== ci.value) ci.value = d; s[key] = d; });
+        var ci = document.createElement("input"); ci.id = id; ci.type = "text"; ci.inputMode = "numeric"; ci.autocomplete = "off"; ci.placeholder = ph; ci.maxLength = 4; ci.value = s[key];
+        ci.addEventListener("input", function () { var d = digits(ci.value).slice(0, 4); if (d !== ci.value) ci.value = d; s[key] = d; });
         ci.addEventListener("keydown", function (e) { if (e.key === "Enter") next(); });
         fd.appendChild(lbl); fd.appendChild(ci);
         return fd;

@@ -179,7 +179,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     return { channel: null, paid: null, format: null, campaign: null, campNew: "",
       useCodes: null, codeOne: "", codeFp: "",
       useAmounts: null, amtOne: ["", "", ""], amtRec: ["", "", ""],
-      url: "", topic: "", step: 0 };
+      url: "", topic: "", step: 0, mode: null };
   }
   function digits(x) { return (x || "").replace(/\D/g, ""); }
   function amountList(arr) { return arr.map(digits).filter(function (a) { return a && +a > 0; }).join(","); }
@@ -211,12 +211,14 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     var l = ["channel"];
     if (!s.channel || isSocial()) l.push("paid");
     l.push("format", "campaign");
-    l.push("amounts", "codes");
+    l.push("codes");
     l.push("url", "done");
     return l;
   }
   function cur() { return steps()[s.step]; }
-  function go(i) { s.step = Math.max(0, Math.min(i, steps().length - 1)); draw(true); window.scrollTo({ top: 0 }); }
+  function go(i) { s.mode = null; s.step = Math.max(0, Math.min(i, steps().length - 1)); draw(true); window.scrollTo({ top: 0 }); }
+  function openAmounts() { s.mode = "amounts"; draw(true); window.scrollTo({ top: 0 }); setTimeout(function () { var i = $("amtOne0"); if (i) i.focus(); }, 0); }
+  function closeAmounts() { s.useAmounts = !!(amountList(s.amtOne) || amountList(s.amtRec)); s.mode = null; draw(true); window.scrollTo({ top: 0 }); }
   function next() { go(s.step + 1); }
 
   function parseUrl(raw) {
@@ -261,12 +263,13 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     stage.classList.remove("enter"); if (animate) { void stage.offsetWidth; stage.classList.add("enter"); }
 
     var meta = $("meta"); meta.innerHTML = "";
-    if (st === "done") meta.textContent = "Færdig";
+    if (s.mode === "amounts") meta.textContent = "Ekstra";
+    else if (st === "done") meta.textContent = "Færdig";
     else meta.textContent = (s.step + 1) + " / " + total;
 
     var trail = h("nav", "trail"); trail.setAttribute("aria-label", "Dine valg");
     all.forEach(function (key, i) {
-      if (i >= s.step || key === "url" || key === "done") return;
+      if ((i >= s.step && !s.mode) || key === "url" || key === "done") return;
       if (trail.childNodes.length) trail.appendChild(h("span", "sep", "/"));
       var b = h("button", null, label(key)); b.type = "button"; b.setAttribute("aria-label", "Ret: " + label(key));
       b.addEventListener("click", function () { go(i); });
@@ -329,7 +332,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       }
     }
 
-    if (st === "amounts" || st === "codes") {
+    if (st === "codes" || s.mode === "amounts") {
       function numField(id, text, get, set, max, ph) {
         var fd = h("div", "field");
         var lbl = h("label", null, text); lbl.htmlFor = id;
@@ -376,16 +379,26 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         }
       }
 
-      if (st === "amounts") {
-        yesNo("Skal der være egne beløbsforslag?", "Overskriver beløbene i donationsformularen.", "useAmounts",
-          "Vælg beløb", "Brug formularens standardbeløb", "amtOne0", function (fm) {
-            fm.appendChild(amountRow("One-off", "amtOne", "amtOne", ["150", "300", "500"]));
-            fm.appendChild(amountRow("Fast, pr. måned", "amtRec", "amtRec", ["100", "150", "200"]));
-            fm.appendChild(h("p", "note", "Tomme felter springes over."));
-          });
+      if (s.mode === "amounts") {
+        stage.appendChild(h("h1", null, "Beløbsforslag"));
+        stage.appendChild(h("p", "sub", "Overskriver beløbene i donationsformularen. Tomme felter springes over."));
+        var fa = h("div", "form");
+        fa.appendChild(amountRow("One-off", "amtOne", "amtOne", ["150", "300", "500"]));
+        fa.appendChild(amountRow("Fast, pr. måned", "amtRec", "amtRec", ["100", "150", "200"]));
+        var acts2 = h("div", "actions");
+        var up = h("button", "go", "Opdater link"); up.type = "button";
+        up.addEventListener("click", closeAmounts);
+        acts2.appendChild(up);
+        if (s.useAmounts) {
+          var rm = h("button", "small", "Fjern beløbsforslag"); rm.type = "button";
+          rm.addEventListener("click", function () { s.amtOne = ["", "", ""]; s.amtRec = ["", "", ""]; closeAmounts(); });
+          acts2.appendChild(rm);
+        }
+        fa.appendChild(acts2);
+        stage.appendChild(fa);
       }
 
-      if (st === "codes") {
+      if (st === "codes" && !s.mode) {
         yesNo("Skal linket have kampagnekoder?", "Kampagnekoder fra Salesforce.", "useCodes",
           "Indtast koder", "Ingen koder", "codeOne", function (fm) {
             fm.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; }, 4, "f.eks. 955"));
@@ -418,7 +431,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       setTimeout(function () { u.focus(); }, 0);
     }
 
-    if (st === "done") {
+    if (st === "done" && !s.mode) {
       var p = parseUrl(s.url).url;
       var vals = { utm_source: s.channel, utm_medium: medium(), utm_campaign: campaign(), utm_content: content() };
       var codes = extras();
@@ -458,6 +471,11 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       acts.appendChild(cp); acts.appendChild(ok); acts.appendChild(same); acts.appendChild(nw);
       stage.appendChild(acts);
 
+      var more = h("div", "list");
+      more.appendChild(opt({ t: s.useAmounts ? "Ret beløbsforslag →" : "Tilføj beløbsforslag →",
+        d: s.useAmounts ? label("amounts") : "Egne beløb i donationsformularen" }, false, openAmounts, "more"));
+      stage.appendChild(more);
+
       var cols = h("div", "cols");
       var c1 = h("div"); c1.appendChild(h("h2", null, "Koderne"));
       var dl = h("dl", "parts");
@@ -475,7 +493,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
 
     if (s.step > 0) {
       var back = h("button", "back", "Tilbage"); back.type = "button";
-      back.addEventListener("click", function () { go(s.step - 1); });
+      back.addEventListener("click", function () { if (s.mode) { s.mode = null; draw(true); } else go(s.step - 1); });
       stage.appendChild(back);
     }
   }

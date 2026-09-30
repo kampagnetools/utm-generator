@@ -117,6 +117,13 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   .opt .d { grid-column: 1; grid-row: 2; text-align: left; font-size: 16px; }
   .top, .trail, .back, .small, .ok { font-size: 17px; }
 }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px 32px; border-top: 1px solid var(--hair); padding-top: 18px; }
+.tab { display: grid; gap: 2px; color: var(--soft); font-size: 18px; }
+.tab.on { color: var(--ink); }
+.tab:not(:disabled):hover { color: var(--ink); }
+.tab:disabled { cursor: default; }
+.tab:disabled .tl { text-decoration: line-through; }
+.tab small { font-size: 15px; color: var(--soft); }
 .theme { position: fixed; top: 18px; right: clamp(16px, 3vw, 40px); z-index: 10; font-size: 16px; color: var(--soft);
   border: 1px solid var(--hair); border-radius: 999px; padding: 8px 14px; background: var(--paper); }
 .theme:hover { color: var(--ink); border-color: var(--ink); }
@@ -145,6 +152,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       <div class="meta" id="meta"></div>
     </header>
     <main class="stage" id="stage" aria-live="polite"></main>
+    <nav class="tabs" id="tabs" aria-label="Værktøjer"></nav>
   </div>
 <script>
 (function () {
@@ -165,7 +173,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       { v: "video", t: "Video" }, { v: "image", t: "Billede" },
       { v: "leadcard", t: "Lead-annonce", d: "Formular i Meta" }, { v: "carousel", t: "Karrusel" }
     ],
-    email: [{ v: "nyhedsbrev", t: "Nyhedsbrev" }, { v: "mail", t: "Enkelt mail" }],
     print: [{ v: "plakat", t: "Plakat" }, { v: "flyer", t: "Flyer" }],
     internal: [{ v: "banner", t: "Banner" }, { v: "popup", t: "Popup" }]
   };
@@ -174,14 +181,29 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     { v: "eoy2026", t: "End of Year 2026", d: "eoy2026" }
   ];
 
-  var DEFAULT_CODE_ONE = "2422", DEFAULT_CODE_FP = "2824";
+  var GIFTS = [
+    { v: "alle", t: "Alle gavebeviser", d: "Oversigten", path: "/produkt-kategori/gavebeviser/" },
+    { v: "valgfrit_tekst", t: "Valgfrit beløb og tekst", d: "Print selv", path: "/produkt/gavebevis-print-selv-valgfrit-beloeb-og-tekst/" },
+    { v: "valgfrit", t: "Valgfrit beløb", d: "Print selv", path: "/produkt/gavebevis-print-selv-valgfrit-beloeb/" },
+    { v: "uden_beloeb", t: "Valgfrit beløb, uden synligt beløb", d: "Print selv", path: "/produkt/gavebevis-valgfrit-beloeb-og-tekst-uden-synligt-beloeb/" },
+    { v: "foedselskit", t: "Fødselskit", d: "Print selv", path: "/produkt/foedselskit/" },
+    { v: "boernevaccination", t: "Børnevaccination", d: "Print selv", path: "/produkt/boernevaccination/" },
+    { v: "kirurg", t: "Udstyr til kirurgen", d: "Print selv", path: "/produkt/udstyr-til-kirurgen/" },
+    { v: "malaria", t: "Malaria-behandling", d: "Print selv", path: "/produkt/malaria-behandling/" },
+    { v: "vand", t: "Vand- og sanitetskit", d: "Print selv", path: "/produkt/vand-og-sanitetskit/" },
+    { v: "kanyler", t: "Sterile kanyler", d: "Print selv", path: "/produkt/sterile-kanyler/" },
+    { v: "gift_certificate", t: "Gift certificate", d: "Engelsk", path: "/produkt/gift-certificate-printable-optional-donation-amount-and-text/" }
+  ];
+  var GIFTS_READY = false;
+
+  var DEFAULT_CODE_ONE = "2822", DEFAULT_CODE_FP = "2824";
 
   var s = fresh();
   function fresh() {
-    return { channel: null, paid: null, format: null, campaign: null, campNew: "",
+    return { channel: null, paid: null, format: null, campaign: null,
       codeOne: "", codeFp: "",
       useAmounts: null, amtOne: ["", "", ""], amtRec: ["", "", ""],
-      url: "", topic: "", step: 0, mode: null };
+      url: "", topic: "", step: 0, mode: null, flow: "link", gift: null };
   }
   function digits(x) { return (x || "").replace(/\D/g, ""); }
   function amountList(arr) { return arr.map(digits).filter(function (a) { return a && +a > 0; }).join(","); }
@@ -190,8 +212,10 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     var am = s.useAmounts && amountsAllowed();
     if (am && amountList(s.amtOne)) e["donation-amounts"] = amountList(s.amtOne);
     if (am && amountList(s.amtRec)) e["donation-amounts-recurring"] = amountList(s.amtRec);
-    e.campaign_code = digits(s.codeOne) || DEFAULT_CODE_ONE;
-    e.campaign_code_recurring = digits(s.codeFp) || DEFAULT_CODE_FP;
+    var one = digits(s.codeOne) || (isEmail() ? DEFAULT_CODE_ONE : "");
+    var fp = digits(s.codeFp) || (isEmail() ? DEFAULT_CODE_FP : "");
+    if (one) e.campaign_code = one;
+    if (fp) e.campaign_code_recurring = fp;
     return e;
   }
   function isAd() { return isSocial() && s.paid === true; }
@@ -208,13 +232,25 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function isSocial() { var c = ch(); return !!(c && c.social); }
   function medium() { var c = ch(); if (!c) return null; return c.social ? (s.paid ? "paid-social" : "organic") : c.medium; }
   function formats() { var c = ch(); if (!c) return []; if (c.social) return s.paid ? FORMATS.paid : FORMATS.organic; return FORMATS[c.medium]; }
-  function campaign() { return s.campaign === "__new" ? clean(s.campNew) : s.campaign; }
-  function content() { var t = clean(s.topic); return s.format ? (t ? s.format + "_" + t : s.format) : null; }
+  function isEmail() { return medium() === "email"; }
+  function isGift() { return s.flow === "gift"; }
+  function gift() { return GIFTS.filter(function (g) { return g.v === s.gift; })[0]; }
+  function campaign() { return isGift() ? "gavebevis" : isEmail() ? "evergreen" : s.campaign; }
+  function content() {
+    if (isGift()) return s.gift;
+    var f = isEmail() ? "nyhedsbrev" : s.format, t = clean(s.topic); return f ? (t ? f + "_" + t : f) : null;
+  }
 
   function steps() {
+    if (isGift()) {
+      var g = ["gift", "channel"];
+      if (!s.channel || isSocial()) g.push("paid");
+      g.push("done");
+      return g;
+    }
     var l = ["channel"];
     if (!s.channel || isSocial()) l.push("paid");
-    l.push("format", "campaign");
+    if (!isEmail()) l.push("format", "campaign");
     l.push("codes");
     l.push("url", "done");
     return l;
@@ -246,6 +282,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     return b;
   }
   function label(key) {
+    if (key === "gift") return gift().t;
     if (key === "channel") return ch().t;
     if (key === "paid") return s.paid ? "Annonce" : "Organisk";
     if (key === "format") { var f = formats().filter(function (x) { return x.v === s.format; })[0]; return f ? f.t : ""; }
@@ -256,7 +293,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     }
     if (key === "codes") {
       var ec = extras(), k = [ec.campaign_code, ec.campaign_code_recurring].filter(Boolean);
-      return "Koder " + k.join("/");
+      return k.length ? "Koder " + k.join("/") : "Ingen koder";
     }
     return "";
   }
@@ -280,6 +317,15 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       trail.appendChild(b);
     });
     stage.appendChild(trail);
+
+    if (st === "gift") {
+      stage.appendChild(h("h1", null, "Hvilket gavebevis?"));
+      var lg = h("div", "list");
+      GIFTS.forEach(function (g) {
+        lg.appendChild(opt(g, s.gift === g.v, function () { s.gift = g.v; s.url = "https://msf.dk" + g.path; next(); }));
+      });
+      stage.appendChild(lg);
+    }
 
     if (st === "channel") {
       stage.appendChild(h("h1", null, "Hvor skal linket deles?"));
@@ -310,30 +356,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       stage.appendChild(h("p", "sub", "Samme kampagne i alle kanaler, så den kan ses samlet."));
       var l4 = h("div", "list");
       CAMPAIGNS.forEach(function (c) { l4.appendChild(opt(c, s.campaign === c.v, function () { s.campaign = c.v; next(); })); });
-      l4.appendChild(opt({ t: "Ny kampagne", d: "Skriv et navn" }, s.campaign === "__new", function () {
-        s.campaign = "__new"; draw(false); var i = $("campNew"); if (i) i.focus();
-      }, "new"));
       stage.appendChild(l4);
-      if (s.campaign === "__new") {
-        var fm = h("div", "form");
-        var f = h("div", "field");
-        var lb = h("label", null, "Kampagnens navn"); lb.htmlFor = "campNew";
-        var inp = document.createElement("input"); inp.id = "campNew"; inp.type = "text"; inp.placeholder = "Julegave 2026"; inp.autocomplete = "off"; inp.value = s.campNew;
-        var note = h("p", "note");
-        var btn = h("button", "go", "Videre"); btn.type = "button";
-        function upd() {
-          var c = clean(inp.value);
-          note.innerHTML = c ? "Bliver til <b></b>" : "Kort navn med år, f.eks. <b></b>";
-          note.querySelector("b").textContent = c || "julegave26";
-          btn.disabled = !c;
-        }
-        inp.addEventListener("input", function () { s.campNew = inp.value; upd(); });
-        inp.addEventListener("keydown", function (e) { if (e.key === "Enter" && clean(inp.value)) next(); });
-        btn.addEventListener("click", next);
-        f.appendChild(lb); f.appendChild(inp); f.appendChild(note);
-        fm.appendChild(f); fm.appendChild(btn);
-        stage.appendChild(fm); upd();
-      }
     }
 
     if (st === "codes" || s.mode === "amounts") {
@@ -386,10 +409,12 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
 
       if (st === "codes" && !s.mode) {
         stage.appendChild(h("h1", null, "Kampagnekoder"));
-        stage.appendChild(h("p", "sub", "Tomt felt giver standardkoden: " + DEFAULT_CODE_ONE + " for One-off og " + DEFAULT_CODE_FP + " for Feltpartner."));
+        stage.appendChild(h("p", "sub", isEmail()
+          ? "Tomt felt giver standardkoden: " + DEFAULT_CODE_ONE + " for One-off og " + DEFAULT_CODE_FP + " for Feltpartner."
+          : "Udfyld én, begge eller ingen."));
         var fk = h("div", "form");
-        fk.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; }, 4, DEFAULT_CODE_ONE + " (standard)"));
-        fk.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; }, 4, DEFAULT_CODE_FP + " (standard)"));
+        fk.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; }, 4, "Indtast kampagnekode"));
+        fk.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; }, 4, "Indtast kampagnekode"));
         var nk = h("button", "go", "Videre"); nk.type = "button";
         nk.addEventListener("click", next);
         fk.appendChild(nk);
@@ -455,10 +480,10 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         try { navigator.clipboard.writeText(href).then(function () { ok.textContent = "Kopieret"; }, fallback); } catch (e) { fallback(); }
       });
       var same = h("button", "small", "Samme kampagne, ny kanal"); same.type = "button";
-      same.addEventListener("click", function () { var keep = { campaign: s.campaign, campNew: s.campNew, codeOne: s.codeOne, codeFp: s.codeFp,
+      same.addEventListener("click", function () { var keep = { campaign: s.campaign, codeOne: s.codeOne, codeFp: s.codeFp,
         useAmounts: s.useAmounts, amtOne: s.amtOne.slice(), amtRec: s.amtRec.slice(), url: s.url, topic: s.topic }; s = fresh(); Object.assign(s, keep); draw(true); });
       var nw = h("button", "small", "Start forfra"); nw.type = "button";
-      nw.addEventListener("click", function () { s = fresh(); draw(true); });
+      nw.addEventListener("click", function () { var fl = s.flow; s = fresh(); s.flow = fl; draw(true); });
       acts.appendChild(cp); acts.appendChild(ok); acts.appendChild(same); acts.appendChild(nw);
       stage.appendChild(acts);
 
@@ -491,6 +516,21 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     }
   }
 
+  function drawTabs() {
+    var nav = $("tabs"); nav.innerHTML = "";
+    function tab(key, text, sub, enabled) {
+      var b = h("button", "tab" + (s.flow === key ? " on" : "")); b.type = "button";
+      b.appendChild(h("span", "tl", text));
+      if (sub) b.appendChild(h("small", null, sub));
+      b.disabled = !enabled;
+      if (s.flow === key) b.setAttribute("aria-current", "page");
+      b.addEventListener("click", function () { if (s.flow === key) return; s = fresh(); s.flow = key; draw(true); drawTabs(); });
+      nav.appendChild(b);
+    }
+    tab("link", "Link", null, true);
+    tab("gift", "Gavebeviser", GIFTS_READY ? null : "Tilgår snarest", GIFTS_READY);
+  }
+
   var T = window.linkbyggerTheme, NAMES = { auto: "Auto", light: "Lys", dark: "Mørk" }, ORDER = ["auto", "light", "dark"];
   function themeLabel() { $("theme").textContent = "Tema: " + NAMES[T.pref()]; }
   $("theme").addEventListener("click", function () {
@@ -499,6 +539,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   });
   themeLabel();
 
+  drawTabs();
   draw(false);
 })();
 </script>

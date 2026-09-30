@@ -174,10 +174,12 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     { v: "eoy2026", t: "End of Year 2026", d: "eoy2026" }
   ];
 
+  var DEFAULT_CODE_ONE = "2422", DEFAULT_CODE_FP = "2824";
+
   var s = fresh();
   function fresh() {
     return { channel: null, paid: null, format: null, campaign: null, campNew: "",
-      useCodes: null, codeOne: "", codeFp: "",
+      codeOne: "", codeFp: "",
       useAmounts: null, amtOne: ["", "", ""], amtRec: ["", "", ""],
       url: "", topic: "", step: 0, mode: null };
   }
@@ -185,13 +187,15 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function amountList(arr) { return arr.map(digits).filter(function (a) { return a && +a > 0; }).join(","); }
   function extras() {
     var e = {};
-    if (s.useAmounts && amountList(s.amtOne)) e["donation-amounts"] = amountList(s.amtOne);
-    if (s.useAmounts && amountList(s.amtRec)) e["donation-amounts-recurring"] = amountList(s.amtRec);
-    if (s.useCodes && digits(s.codeOne)) e.campaign_code = digits(s.codeOne);
-    if (s.useCodes && digits(s.codeFp)) e.campaign_code_recurring = digits(s.codeFp);
+    var am = s.useAmounts && amountsAllowed();
+    if (am && amountList(s.amtOne)) e["donation-amounts"] = amountList(s.amtOne);
+    if (am && amountList(s.amtRec)) e["donation-amounts-recurring"] = amountList(s.amtRec);
+    e.campaign_code = digits(s.codeOne) || DEFAULT_CODE_ONE;
+    e.campaign_code_recurring = digits(s.codeFp) || DEFAULT_CODE_FP;
     return e;
   }
   function isAd() { return isSocial() && s.paid === true; }
+  function amountsAllowed() { return isAd() || medium() === "email"; }
   var $ = function (id) { return document.getElementById(id); };
 
   function clean(x) {
@@ -252,7 +256,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     }
     if (key === "codes") {
       var ec = extras(), k = [ec.campaign_code, ec.campaign_code_recurring].filter(Boolean);
-      return k.length ? "Koder " + k.join("/") : "Ingen koder";
+      return "Koder " + k.join("/");
     }
     return "";
   }
@@ -360,24 +364,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         return fd;
       }
 
-      function yesNo(title, sub, flag, yesText, noText, focusId, fields) {
-        stage.appendChild(h("h1", null, title));
-        stage.appendChild(h("p", "sub", sub));
-        var lst = h("div", "list");
-        lst.appendChild(opt({ t: "Nej", d: noText }, s[flag] === false, function () { s[flag] = false; next(); }));
-        lst.appendChild(opt({ t: "Ja", d: yesText }, s[flag] === true, function () {
-          s[flag] = true; draw(false); var i = $(focusId); if (i) i.focus();
-        }));
-        stage.appendChild(lst);
-        if (s[flag] === true) {
-          var fm = h("div", "form");
-          fields(fm);
-          var nx = h("button", "go", "Videre"); nx.type = "button";
-          nx.addEventListener("click", next);
-          fm.appendChild(nx);
-          stage.appendChild(fm);
-        }
-      }
 
       if (s.mode === "amounts") {
         stage.appendChild(h("h1", null, "Beløbsforslag"));
@@ -399,11 +385,16 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       }
 
       if (st === "codes" && !s.mode) {
-        yesNo("Skal linket have kampagnekoder?", "Kampagnekoder fra Salesforce.", "useCodes",
-          "Indtast koder", "Ingen koder", "codeOne", function (fm) {
-            fm.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; }, 4, "f.eks. 955"));
-            fm.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; }, 4, "f.eks. 3391"));
-          });
+        stage.appendChild(h("h1", null, "Kampagnekoder"));
+        stage.appendChild(h("p", "sub", "Tomt felt giver standardkoden: " + DEFAULT_CODE_ONE + " for One-off og " + DEFAULT_CODE_FP + " for Feltpartner."));
+        var fk = h("div", "form");
+        fk.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; }, 4, DEFAULT_CODE_ONE + " (standard)"));
+        fk.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; }, 4, DEFAULT_CODE_FP + " (standard)"));
+        var nk = h("button", "go", "Videre"); nk.type = "button";
+        nk.addEventListener("click", next);
+        fk.appendChild(nk);
+        stage.appendChild(fk);
+        setTimeout(function () { var i = $("codeOne"); if (i) i.focus(); }, 0);
       }
     }
 
@@ -411,7 +402,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       stage.appendChild(h("h1", null, "Hvor skal brugeren lande?"));
       var fm2 = h("div", "form");
       var f1 = h("div", "field");
-      var ul = h("label", null, "Side på msf.dk — kopiér adressen fra browseren"); ul.htmlFor = "url";
+      var ul = h("label", null, "Side på msf.dk. Kopiér adressen fra browseren."); ul.htmlFor = "url";
       var u = document.createElement("input"); u.id = "url"; u.type = "url"; u.placeholder = "msf.dk/stoet"; u.autocomplete = "off"; u.spellcheck = false; u.value = s.url;
       var err = h("p", "err"); err.hidden = true;
       f1.appendChild(ul); f1.appendChild(u); f1.appendChild(err);
@@ -459,22 +450,24 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         var fallback = function () {
           var r = document.createRange(); r.selectNodeContents(link);
           var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
-          ok.textContent = "Markeret — tryk Ctrl+C";
+          ok.textContent = "Markeret. Tryk Ctrl+C.";
         };
         try { navigator.clipboard.writeText(href).then(function () { ok.textContent = "Kopieret"; }, fallback); } catch (e) { fallback(); }
       });
       var same = h("button", "small", "Samme kampagne, ny kanal"); same.type = "button";
-      same.addEventListener("click", function () { var keep = { campaign: s.campaign, campNew: s.campNew, useCodes: s.useCodes, codeOne: s.codeOne, codeFp: s.codeFp,
+      same.addEventListener("click", function () { var keep = { campaign: s.campaign, campNew: s.campNew, codeOne: s.codeOne, codeFp: s.codeFp,
         useAmounts: s.useAmounts, amtOne: s.amtOne.slice(), amtRec: s.amtRec.slice(), url: s.url, topic: s.topic }; s = fresh(); Object.assign(s, keep); draw(true); });
       var nw = h("button", "small", "Start forfra"); nw.type = "button";
       nw.addEventListener("click", function () { s = fresh(); draw(true); });
       acts.appendChild(cp); acts.appendChild(ok); acts.appendChild(same); acts.appendChild(nw);
       stage.appendChild(acts);
 
-      var more = h("div", "list");
-      more.appendChild(opt({ t: s.useAmounts ? "Ret beløbsforslag →" : "Tilføj beløbsforslag →",
-        d: s.useAmounts ? label("amounts") : "Egne beløb i donationsformularen" }, false, openAmounts, "more"));
-      stage.appendChild(more);
+      if (amountsAllowed()) {
+        var more = h("div", "list");
+        more.appendChild(opt({ t: s.useAmounts ? "Ret beløbsforslag →" : "Tilføj beløbsforslag →",
+          d: s.useAmounts ? label("amounts") : "Egne beløb i donationsformularen" }, false, openAmounts, "more"));
+        stage.appendChild(more);
+      }
 
       var cols = h("div", "cols");
       var c1 = h("div"); c1.appendChild(h("h2", null, "Koderne"));

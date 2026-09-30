@@ -152,10 +152,10 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   // Tilvalg, der ender som parametre på linket (før UTM-koderne)
   function extras() {
     var e = {};
-    if (s.useCodes && digits(s.codeOne)) e.campaign_code = digits(s.codeOne);
-    if (s.useCodes && digits(s.codeFp)) e.campaign_code_recurring = digits(s.codeFp);
     if (s.useAmounts && amountList(s.amtOne)) e["donation-amounts"] = amountList(s.amtOne);
     if (s.useAmounts && amountList(s.amtRec)) e["donation-amounts-recurring"] = amountList(s.amtRec);
+    if (s.useCodes && digits(s.codeOne)) e.campaign_code = digits(s.codeOne);
+    if (s.useCodes && digits(s.codeFp)) e.campaign_code_recurring = digits(s.codeFp);
     return e;
   }
   function isAd() { return isSocial() && s.paid === true; }
@@ -213,8 +213,8 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     if (key === "campaign") return s.campaign === "evergreen" ? "Ingen kampagne" : campaign();
     if (key === "extras") {
       var e = extras(), c = [];
-      if (e.campaign_code || e.campaign_code_recurring) c.push("Koder " + [e.campaign_code, e.campaign_code_recurring].filter(Boolean).join("/"));
       if (e["donation-amounts"] || e["donation-amounts-recurring"]) c.push("Beløb " + [e["donation-amounts"], e["donation-amounts-recurring"]].filter(Boolean).join(" · "));
+      if (e.campaign_code || e.campaign_code_recurring) c.push("Koder " + [e.campaign_code, e.campaign_code_recurring].filter(Boolean).join("/"));
       return c.length ? c.join(", ") : "Ingen tilvalg";
     }
     return "";
@@ -325,18 +325,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         return fd;
       }
 
-      var lx = h("div", "list");
-      lx.appendChild(opt({ t: "Kampagnekoder", d: s.useCodes ? "Fjern" : "Koder fra OnlineFundraising" }, s.useCodes, function () {
-        s.useCodes = !s.useCodes; draw(false); if (s.useCodes) { var i = $("codeOne"); if (i) i.focus(); }
-      }, "toggle"));
-      stage.appendChild(lx);
-      if (s.useCodes) {
-        var fc = h("div", "form");
-        fc.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; }, 4, "f.eks. 955"));
-        fc.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; }, 4, "f.eks. 3391"));
-        stage.appendChild(fc);
-      }
-
       var la = h("div", "list");
       la.appendChild(opt({ t: "Beløbsforslag", d: s.useAmounts ? "Fjern" : "Egne beløb i donationsformularen" }, s.useAmounts, function () {
         s.useAmounts = !s.useAmounts; draw(false); if (s.useAmounts) { var i = $("amtOne0"); if (i) i.focus(); }
@@ -348,6 +336,18 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         fa.appendChild(amountRow("Fast, pr. måned", "amtRec", "amtRec", ["100", "150", "200"]));
         fa.appendChild(h("p", "note", "Overskriver formularens standardbeløb. Tomme felter springes over."));
         stage.appendChild(fa);
+      }
+
+      var lx = h("div", "list");
+      lx.appendChild(opt({ t: "Kampagnekoder", d: s.useCodes ? "Fjern" : "Koder fra Salesforce" }, s.useCodes, function () {
+        s.useCodes = !s.useCodes; draw(false); if (s.useCodes) { var i = $("codeOne"); if (i) i.focus(); }
+      }, "toggle"));
+      stage.appendChild(lx);
+      if (s.useCodes) {
+        var fc = h("div", "form");
+        fc.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; }, 4, "f.eks. 955"));
+        fc.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; }, 4, "f.eks. 3391"));
+        stage.appendChild(fc);
       }
 
       var nx = h("button", "go", s.useCodes || s.useAmounts ? "Videre" : "Spring over"); nx.type = "button";

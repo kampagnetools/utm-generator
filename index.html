@@ -10,7 +10,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400&display=swap">
   <style>
-/* Linkbygger - bygger links til msf.dk med faste UTM-koder */
 :root {
   color-scheme: light;
   --paper: #FFFFFF;
@@ -18,11 +17,27 @@
   --soft: rgba(0, 0, 0, .38);
   --hair: rgba(0, 0, 0, .12);
   --red: #EE0000;
+  --desc: rgba(0, 0, 0, .62);
+  --hover: rgba(0, 0, 0, .035);
+  --ph: rgba(0, 0, 0, .2);
+  --off: rgba(0, 0, 0, .12);
   --f: "Geist", "Neue Haas Grotesk Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --f-mono: "Geist Mono", ui-monospace, Consolas, monospace;
 }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #121212;
+  --ink: rgba(255, 255, 255, .92);
+  --soft: rgba(255, 255, 255, .48);
+  --hair: rgba(255, 255, 255, .14);
+  --red: #FF4D4D;
+  --desc: rgba(255, 255, 255, .7);
+  --hover: rgba(255, 255, 255, .06);
+  --ph: rgba(255, 255, 255, .25);
+  --off: rgba(255, 255, 255, .14);
+}
 * { box-sizing: border-box; }
-html, body { background: var(--paper); }
+html, body { background: var(--paper); transition: background .3s, color .3s; }
 body { margin: 0; color: var(--ink); font: 400 20px/1.3 var(--f); letter-spacing: -.01em; padding-inline: clamp(16px, 3vw, 40px); padding-block: 22px; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; letter-spacing: inherit; }
 
@@ -47,8 +62,8 @@ h1 { margin: 0; font-weight: 500; font-size: clamp(34px, 5vw, 60px); line-height
 .opt { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px; width: 100%;
   border-bottom: 1px solid var(--hair); padding: 18px 12px; transition: background .12s ease-in-out; }
 .opt .t { font-size: clamp(22px, 2.6vw, 30px); line-height: 1.15; letter-spacing: -.015em; font-weight: 500; }
-.opt .d { color: rgba(0, 0, 0, .62); font-size: 18px; text-align: right; }
-.opt:hover, .opt:focus-visible { background: rgba(0, 0, 0, .035); }
+.opt .d { color: var(--desc); font-size: 18px; text-align: right; }
+.opt:hover, .opt:focus-visible { background: var(--hover); }
 .opt.new .t { color: var(--soft); }
 
 .form { display: grid; gap: 28px; max-width: 900px; }
@@ -56,7 +71,7 @@ h1 { margin: 0; font-weight: 500; font-size: clamp(34px, 5vw, 60px); line-height
 .field label { color: var(--soft); font-size: 18px; }
 .field input { width: 100%; border: 0; border-bottom: 1px solid var(--ink); background: transparent; color: var(--ink);
   font: 400 clamp(20px, 2.2vw, 26px)/1.3 var(--f); letter-spacing: -.01em; padding: 6px 0 10px; border-radius: 0; }
-.field input::placeholder { color: rgba(0,0,0,.2); }
+.field input::placeholder { color: var(--ph); }
 .field input:focus { outline: none; border-bottom-color: var(--red); }
 .note { margin: 0; color: var(--soft); font-size: 18px; }
 .note b { font: 400 17px var(--f-mono); color: var(--ink); letter-spacing: 0; }
@@ -66,12 +81,12 @@ h1 { margin: 0; font-weight: 500; font-size: clamp(34px, 5vw, 60px); line-height
 .amt:focus-within { border-bottom-color: var(--red); }
 .amt input { border: 0; padding: 6px 0 10px; min-width: 0; }
 .amt span { color: var(--soft); font-size: 18px; }
-.opt.toggle.sel .t::after { content: " ✓"; color: var(--red); }
+
 
 .go { font-size: 18px; font-weight: 500; letter-spacing: 0; line-height: 1; justify-self: start;
   background: var(--ink); color: var(--paper); border-radius: 999px; padding: 15px 26px; transition: background .15s; }
 .go:hover { background: var(--red); }
-.go:disabled { background: rgba(0,0,0,.12); color: var(--soft); cursor: default; }
+.go:disabled { background: var(--off); color: var(--soft); cursor: default; }
 
 .linkout { font: 400 clamp(16px, 1.6vw, 20px)/1.6 var(--f-mono); letter-spacing: -.01em; word-break: break-all; margin: 0; max-width: 1100px; }
 .linkout .k { color: var(--soft); }
@@ -102,9 +117,28 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   .opt .d { grid-column: 1; grid-row: 2; text-align: left; font-size: 16px; }
   .top, .trail, .back, .small, .ok { font-size: 17px; }
 }
+.theme { position: fixed; top: 18px; right: clamp(16px, 3vw, 40px); z-index: 10; font-size: 16px; color: var(--soft);
+  border: 1px solid var(--hair); border-radius: 999px; padding: 8px 14px; background: var(--paper); }
+.theme:hover { color: var(--ink); border-color: var(--ink); }
   </style>
+  <script>
+  (function () {
+    var KEY = "linkbygger-theme";
+    function pref() { try { return localStorage.getItem(KEY) || "auto"; } catch (e) { return "auto"; } }
+    function save(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
+    function apply() {
+      var p = pref(), hr = new Date().getHours();
+      var dark = p === "dark" || (p === "auto" && (hr >= 19 || hr < 7));
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    }
+    window.linkbyggerTheme = { pref: pref, save: save, apply: apply };
+    apply();
+    setInterval(apply, 60000);
+  })();
+  </script>
 </head>
 <body>
+  <button class="theme" id="theme" type="button" aria-label="Skift tema"></button>
   <div class="module">
     <header class="top">
       <div class="name">Linkbygger</div>
@@ -143,13 +177,12 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   var s = fresh();
   function fresh() {
     return { channel: null, paid: null, format: null, campaign: null, campNew: "",
-      useCodes: false, codeOne: "", codeFp: "",
-      useAmounts: false, amtOne: ["", "", ""], amtRec: ["", "", ""],
+      useCodes: null, codeOne: "", codeFp: "",
+      useAmounts: null, amtOne: ["", "", ""], amtRec: ["", "", ""],
       url: "", topic: "", step: 0 };
   }
   function digits(x) { return (x || "").replace(/\D/g, ""); }
   function amountList(arr) { return arr.map(digits).filter(function (a) { return a && +a > 0; }).join(","); }
-  // Tilvalg, der ender som parametre på linket (før UTM-koderne)
   function extras() {
     var e = {};
     if (s.useAmounts && amountList(s.amtOne)) e["donation-amounts"] = amountList(s.amtOne);
@@ -178,7 +211,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     var l = ["channel"];
     if (!s.channel || isSocial()) l.push("paid");
     l.push("format", "campaign");
-    l.push("extras");
+    l.push("amounts", "codes");
     l.push("url", "done");
     return l;
   }
@@ -211,11 +244,13 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     if (key === "paid") return s.paid ? "Annonce" : "Organisk";
     if (key === "format") { var f = formats().filter(function (x) { return x.v === s.format; })[0]; return f ? f.t : ""; }
     if (key === "campaign") return s.campaign === "evergreen" ? "Ingen kampagne" : campaign();
-    if (key === "extras") {
-      var e = extras(), c = [];
-      if (e["donation-amounts"] || e["donation-amounts-recurring"]) c.push("Beløb " + [e["donation-amounts"], e["donation-amounts-recurring"]].filter(Boolean).join(" · "));
-      if (e.campaign_code || e.campaign_code_recurring) c.push("Koder " + [e.campaign_code, e.campaign_code_recurring].filter(Boolean).join("/"));
-      return c.length ? c.join(", ") : "Ingen tilvalg";
+    if (key === "amounts") {
+      var ea = extras(), a = [ea["donation-amounts"], ea["donation-amounts-recurring"]].filter(Boolean);
+      return a.length ? "Beløb " + a.join(" · ") : "Standardbeløb";
+    }
+    if (key === "codes") {
+      var ec = extras(), k = [ec.campaign_code, ec.campaign_code_recurring].filter(Boolean);
+      return k.length ? "Koder " + k.join("/") : "Ingen koder";
     }
     return "";
   }
@@ -294,10 +329,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       }
     }
 
-    if (st === "extras") {
-      stage.appendChild(h("h1", null, "Tilvalg"));
-      stage.appendChild(h("p", "sub", "Valgfrit. Spring over, hvis du ikke skal bruge det."));
-
+    if (st === "amounts" || st === "codes") {
       function numField(id, text, get, set, max, ph) {
         var fd = h("div", "field");
         var lbl = h("label", null, text); lbl.htmlFor = id;
@@ -325,38 +357,45 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         return fd;
       }
 
-      var la = h("div", "list");
-      la.appendChild(opt({ t: "Beløbsforslag", d: s.useAmounts ? "Fjern" : "Egne beløb i donationsformularen" }, s.useAmounts, function () {
-        s.useAmounts = !s.useAmounts; draw(false); if (s.useAmounts) { var i = $("amtOne0"); if (i) i.focus(); }
-      }, "toggle"));
-      stage.appendChild(la);
-      if (s.useAmounts) {
-        var fa = h("div", "form");
-        fa.appendChild(amountRow("One-off", "amtOne", "amtOne", ["150", "300", "500"]));
-        fa.appendChild(amountRow("Fast, pr. måned", "amtRec", "amtRec", ["100", "150", "200"]));
-        fa.appendChild(h("p", "note", "Overskriver formularens standardbeløb. Tomme felter springes over."));
-        stage.appendChild(fa);
+      function yesNo(title, sub, flag, yesText, noText, focusId, fields) {
+        stage.appendChild(h("h1", null, title));
+        stage.appendChild(h("p", "sub", sub));
+        var lst = h("div", "list");
+        lst.appendChild(opt({ t: "Nej", d: noText }, s[flag] === false, function () { s[flag] = false; next(); }));
+        lst.appendChild(opt({ t: "Ja", d: yesText }, s[flag] === true, function () {
+          s[flag] = true; draw(false); var i = $(focusId); if (i) i.focus();
+        }));
+        stage.appendChild(lst);
+        if (s[flag] === true) {
+          var fm = h("div", "form");
+          fields(fm);
+          var nx = h("button", "go", "Videre"); nx.type = "button";
+          nx.addEventListener("click", next);
+          fm.appendChild(nx);
+          stage.appendChild(fm);
+        }
       }
 
-      var lx = h("div", "list");
-      lx.appendChild(opt({ t: "Kampagnekoder", d: s.useCodes ? "Fjern" : "Koder fra Salesforce" }, s.useCodes, function () {
-        s.useCodes = !s.useCodes; draw(false); if (s.useCodes) { var i = $("codeOne"); if (i) i.focus(); }
-      }, "toggle"));
-      stage.appendChild(lx);
-      if (s.useCodes) {
-        var fc = h("div", "form");
-        fc.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; }, 4, "f.eks. 955"));
-        fc.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; }, 4, "f.eks. 3391"));
-        stage.appendChild(fc);
+      if (st === "amounts") {
+        yesNo("Skal der være egne beløbsforslag?", "Overskriver beløbene i donationsformularen.", "useAmounts",
+          "Vælg beløb", "Brug formularens standardbeløb", "amtOne0", function (fm) {
+            fm.appendChild(amountRow("One-off", "amtOne", "amtOne", ["150", "300", "500"]));
+            fm.appendChild(amountRow("Fast, pr. måned", "amtRec", "amtRec", ["100", "150", "200"]));
+            fm.appendChild(h("p", "note", "Tomme felter springes over."));
+          });
       }
 
-      var nx = h("button", "go", s.useCodes || s.useAmounts ? "Videre" : "Spring over"); nx.type = "button";
-      nx.addEventListener("click", next);
-      stage.appendChild(nx);
+      if (st === "codes") {
+        yesNo("Skal linket have kampagnekoder?", "Kampagnekoder fra Salesforce.", "useCodes",
+          "Indtast koder", "Ingen koder", "codeOne", function (fm) {
+            fm.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; }, 4, "f.eks. 955"));
+            fm.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; }, 4, "f.eks. 3391"));
+          });
+      }
     }
 
     if (st === "url") {
-      stage.appendChild(h("h1", null, "Hvor skal folk lande?"));
+      stage.appendChild(h("h1", null, "Hvor skal brugeren lande?"));
       var fm2 = h("div", "form");
       var f1 = h("div", "field");
       var ul = h("label", null, "Side på msf.dk — kopiér adressen fra browseren"); ul.htmlFor = "url";
@@ -386,7 +425,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       Object.keys(codes).forEach(function (k) { p.searchParams.set(k, codes[k]); });
       Object.keys(vals).forEach(function (k) { p.searchParams.set(k, vals[k]); });
       Object.keys(codes).forEach(function (k) { vals[k] = codes[k]; });
-      // Beløbslister skal have rigtige kommaer, ikke %2C
       var href = p.toString().replace(/%2C/gi, ",");
 
       stage.appendChild(h("h1", null, "Dit link er klar."));
@@ -441,6 +479,14 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       stage.appendChild(back);
     }
   }
+
+  var T = window.linkbyggerTheme, NAMES = { auto: "Auto", light: "Lys", dark: "Mørk" }, ORDER = ["auto", "light", "dark"];
+  function themeLabel() { $("theme").textContent = "Tema: " + NAMES[T.pref()]; }
+  $("theme").addEventListener("click", function () {
+    var nextPref = ORDER[(ORDER.indexOf(T.pref()) + 1) % ORDER.length];
+    T.save(nextPref); T.apply(); themeLabel();
+  });
+  themeLabel();
 
   draw(false);
 })();

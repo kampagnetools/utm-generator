@@ -61,6 +61,12 @@ h1 { margin: 0; font-weight: 500; font-size: clamp(34px, 5vw, 60px); line-height
 .note { margin: 0; color: var(--soft); font-size: 18px; }
 .note b { font: 400 17px var(--f-mono); color: var(--ink); letter-spacing: 0; }
 .err { margin: 0; color: var(--red); font-size: 18px; }
+.amounts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.amt { display: flex; align-items: baseline; gap: 6px; border-bottom: 1px solid var(--ink); }
+.amt:focus-within { border-bottom-color: var(--red); }
+.amt input { border: 0; padding: 6px 0 10px; min-width: 0; }
+.amt span { color: var(--soft); font-size: 18px; }
+.opt.toggle.sel .t::after { content: " ✓"; color: var(--red); }
 
 .go { font-size: 18px; font-weight: 500; letter-spacing: 0; line-height: 1; justify-self: start;
   background: var(--ink); color: var(--paper); border-radius: 999px; padding: 15px 26px; transition: background .15s; }
@@ -135,8 +141,23 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   ];
 
   var s = fresh();
-  function fresh() { return { channel: null, paid: null, format: null, campaign: null, campNew: "", codeOne: "", codeFp: "", url: "", topic: "", step: 0 }; }
+  function fresh() {
+    return { channel: null, paid: null, format: null, campaign: null, campNew: "",
+      useCodes: false, codeOne: "", codeFp: "",
+      useAmounts: false, amtOne: ["", "", ""], amtRec: ["", "", ""],
+      url: "", topic: "", step: 0 };
+  }
   function digits(x) { return (x || "").replace(/\D/g, ""); }
+  function amountList(arr) { return arr.map(digits).filter(function (a) { return a && +a > 0; }).join(","); }
+  // Tilvalg, der ender som parametre på linket (før UTM-koderne)
+  function extras() {
+    var e = {};
+    if (s.useCodes && digits(s.codeOne)) e.campaign_code = digits(s.codeOne);
+    if (s.useCodes && digits(s.codeFp)) e.campaign_code_recurring = digits(s.codeFp);
+    if (s.useAmounts && amountList(s.amtOne)) e["donation-amounts"] = amountList(s.amtOne);
+    if (s.useAmounts && amountList(s.amtRec)) e["donation-amounts-recurring"] = amountList(s.amtRec);
+    return e;
+  }
   function isAd() { return isSocial() && s.paid === true; }
   var $ = function (id) { return document.getElementById(id); };
 
@@ -157,7 +178,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     var l = ["channel"];
     if (!s.channel || isSocial()) l.push("paid");
     l.push("format", "campaign");
-    if (isAd()) l.push("codes");
+    l.push("extras");
     l.push("url", "done");
     return l;
   }
@@ -190,11 +211,11 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     if (key === "paid") return s.paid ? "Annonce" : "Organisk";
     if (key === "format") { var f = formats().filter(function (x) { return x.v === s.format; })[0]; return f ? f.t : ""; }
     if (key === "campaign") return s.campaign === "evergreen" ? "Ingen kampagne" : campaign();
-    if (key === "codes") {
-      var c = [];
-      if (digits(s.codeOne)) c.push("One-off " + digits(s.codeOne));
-      if (digits(s.codeFp)) c.push("Feltpartner " + digits(s.codeFp));
-      return c.length ? c.join(", ") : "Ingen koder";
+    if (key === "extras") {
+      var e = extras(), c = [];
+      if (e.campaign_code || e.campaign_code_recurring) c.push("Koder " + [e.campaign_code, e.campaign_code_recurring].filter(Boolean).join("/"));
+      if (e["donation-amounts"] || e["donation-amounts-recurring"]) c.push("Beløb " + [e["donation-amounts"], e["donation-amounts-recurring"]].filter(Boolean).join(" · "));
+      return c.length ? c.join(", ") : "Ingen tilvalg";
     }
     return "";
   }
@@ -273,26 +294,65 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       }
     }
 
-    if (st === "codes") {
-      stage.appendChild(h("h1", null, "Kampagnekoder"));
-      stage.appendChild(h("p", "sub", "Koderne fra OnlineFundraising, så donationen lander på den rigtige kampagne. Udfyld én, begge eller ingen."));
-      var fm3 = h("div", "form");
-      function codeField(id, text, key, ph) {
+    if (st === "extras") {
+      stage.appendChild(h("h1", null, "Tilvalg"));
+      stage.appendChild(h("p", "sub", "Valgfrit. Spring over, hvis du ikke skal bruge det."));
+
+      function numField(id, text, get, set, max, ph) {
         var fd = h("div", "field");
         var lbl = h("label", null, text); lbl.htmlFor = id;
-        var ci = document.createElement("input"); ci.id = id; ci.type = "text"; ci.inputMode = "numeric"; ci.autocomplete = "off"; ci.placeholder = ph; ci.maxLength = 4; ci.value = s[key];
-        ci.addEventListener("input", function () { var d = digits(ci.value).slice(0, 4); if (d !== ci.value) ci.value = d; s[key] = d; });
+        var ci = document.createElement("input"); ci.id = id; ci.type = "text"; ci.inputMode = "numeric"; ci.autocomplete = "off";
+        ci.placeholder = ph; ci.maxLength = max; ci.value = get();
+        ci.addEventListener("input", function () { var d = digits(ci.value).slice(0, max); if (d !== ci.value) ci.value = d; set(d); });
         ci.addEventListener("keydown", function (e) { if (e.key === "Enter") next(); });
         fd.appendChild(lbl); fd.appendChild(ci);
         return fd;
       }
-      fm3.appendChild(codeField("codeOne", "Kampagnekode One-off", "codeOne", "f.eks. 955"));
-      fm3.appendChild(codeField("codeFp", "Kampagnekode Feltpartner", "codeFp", "f.eks. 3391"));
-      var nx = h("button", "go", "Videre"); nx.type = "button";
+      function amountRow(title, key, idp, ph) {
+        var fd = h("div", "field");
+        fd.appendChild(h("label", null, title));
+        var row = h("div", "amounts");
+        [0, 1, 2].forEach(function (i) {
+          var ai = document.createElement("input"); ai.id = idp + i; ai.type = "text"; ai.inputMode = "numeric"; ai.autocomplete = "off";
+          ai.placeholder = ph[i]; ai.maxLength = 6; ai.value = s[key][i];
+          ai.setAttribute("aria-label", title + ", beløb " + (i + 1));
+          ai.addEventListener("input", function () { var d = digits(ai.value).slice(0, 6); if (d !== ai.value) ai.value = d; s[key][i] = d; });
+          ai.addEventListener("keydown", function (e) { if (e.key === "Enter") next(); });
+          var cell = h("div", "amt"); cell.appendChild(ai); cell.appendChild(h("span", null, "kr."));
+          row.appendChild(cell);
+        });
+        fd.appendChild(row);
+        return fd;
+      }
+
+      var lx = h("div", "list");
+      lx.appendChild(opt({ t: "Kampagnekoder", d: s.useCodes ? "Fjern" : "Koder fra OnlineFundraising" }, s.useCodes, function () {
+        s.useCodes = !s.useCodes; draw(false); if (s.useCodes) { var i = $("codeOne"); if (i) i.focus(); }
+      }, "toggle"));
+      stage.appendChild(lx);
+      if (s.useCodes) {
+        var fc = h("div", "form");
+        fc.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; }, 4, "f.eks. 955"));
+        fc.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; }, 4, "f.eks. 3391"));
+        stage.appendChild(fc);
+      }
+
+      var la = h("div", "list");
+      la.appendChild(opt({ t: "Beløbsforslag", d: s.useAmounts ? "Fjern" : "Egne beløb i donationsformularen" }, s.useAmounts, function () {
+        s.useAmounts = !s.useAmounts; draw(false); if (s.useAmounts) { var i = $("amtOne0"); if (i) i.focus(); }
+      }, "toggle"));
+      stage.appendChild(la);
+      if (s.useAmounts) {
+        var fa = h("div", "form");
+        fa.appendChild(amountRow("One-off", "amtOne", "amtOne", ["150", "300", "500"]));
+        fa.appendChild(amountRow("Fast, pr. måned", "amtRec", "amtRec", ["100", "150", "200"]));
+        fa.appendChild(h("p", "note", "Overskriver formularens standardbeløb. Tomme felter springes over."));
+        stage.appendChild(fa);
+      }
+
+      var nx = h("button", "go", s.useCodes || s.useAmounts ? "Videre" : "Spring over"); nx.type = "button";
       nx.addEventListener("click", next);
-      fm3.appendChild(nx);
-      stage.appendChild(fm3);
-      setTimeout(function () { var i = $("codeOne"); if (i) i.focus(); }, 0);
+      stage.appendChild(nx);
     }
 
     if (st === "url") {
@@ -322,13 +382,12 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     if (st === "done") {
       var p = parseUrl(s.url).url;
       var vals = { utm_source: s.channel, utm_medium: medium(), utm_campaign: campaign(), utm_content: content() };
-      var codes = {};
-      if (isAd() && digits(s.codeOne)) codes.campaign_code = digits(s.codeOne);
-      if (isAd() && digits(s.codeFp)) codes.campaign_code_recurring = digits(s.codeFp);
+      var codes = extras();
       Object.keys(codes).forEach(function (k) { p.searchParams.set(k, codes[k]); });
       Object.keys(vals).forEach(function (k) { p.searchParams.set(k, vals[k]); });
       Object.keys(codes).forEach(function (k) { vals[k] = codes[k]; });
-      var href = p.toString();
+      // Beløbslister skal have rigtige kommaer, ikke %2C
+      var href = p.toString().replace(/%2C/gi, ",");
 
       stage.appendChild(h("h1", null, "Dit link er klar."));
       var link = h("p", "linkout");
@@ -354,7 +413,8 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         try { navigator.clipboard.writeText(href).then(function () { ok.textContent = "Kopieret"; }, fallback); } catch (e) { fallback(); }
       });
       var same = h("button", "small", "Samme kampagne, ny kanal"); same.type = "button";
-      same.addEventListener("click", function () { var keep = { campaign: s.campaign, campNew: s.campNew, codeOne: s.codeOne, codeFp: s.codeFp, url: s.url, topic: s.topic }; s = fresh(); Object.assign(s, keep); draw(true); });
+      same.addEventListener("click", function () { var keep = { campaign: s.campaign, campNew: s.campNew, useCodes: s.useCodes, codeOne: s.codeOne, codeFp: s.codeFp,
+        useAmounts: s.useAmounts, amtOne: s.amtOne.slice(), amtRec: s.amtRec.slice(), url: s.url, topic: s.topic }; s = fresh(); Object.assign(s, keep); draw(true); });
       var nw = h("button", "small", "Start forfra"); nw.type = "button";
       nw.addEventListener("click", function () { s = fresh(); draw(true); });
       acts.appendChild(cp); acts.appendChild(ok); acts.appendChild(same); acts.appendChild(nw);

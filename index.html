@@ -64,7 +64,8 @@ h1 { margin: 0; font-weight: 500; font-size: clamp(34px, 5vw, 60px); line-height
 .opt .t { font-size: clamp(22px, 2.6vw, 30px); line-height: 1.15; letter-spacing: -.015em; font-weight: 500; }
 .opt .d { color: var(--desc); font-size: 18px; text-align: right; }
 .opt:hover, .opt:focus-visible { background: var(--hover); }
-.opt.new .t { color: var(--soft); }
+.opt .tt { display: grid; gap: 4px; min-width: 0; }
+.opt .ov { font-size: 15px; line-height: 1.35; color: var(--soft); letter-spacing: 0; }
 
 .form { display: grid; gap: 28px; max-width: 900px; }
 .field { display: grid; gap: 6px; }
@@ -160,13 +161,40 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     { v: "msf-web", t: "MSF.DK", d: "Banner, popup", medium: "internal" }
   ];
   var FORMATS = {
-    organic: [
-      { v: "post", t: "Opslag" }, { v: "story", t: "Story" }, { v: "reel", t: "Reel" },
-      { v: "video", t: "Video" }, { v: "link_in_bio", t: "Link i bio", d: "Linket på profilen" }
+    facebook: [
+      { v: "post", t: "Opslag", d: "Billede, tekst eller link" },
+      { v: "carousel", t: "Karrusel", d: "Flere billeder i ét opslag" },
+      { v: "video", t: "Video", d: "Længere video", o: "Overlapper med Reel. Korte videoer er reels." },
+      { v: "reel", t: "Reel", d: "Kort video", o: "Vises også i feed som video." },
+      { v: "story", t: "Story", d: "Forsvinder efter 24 timer" }
     ],
-    paid: [
-      { v: "video", t: "Video" }, { v: "image", t: "Billede" },
-      { v: "leadcard", t: "Lead-annonce", d: "Formular i Meta" }, { v: "carousel", t: "Karrusel" }
+    instagram: [
+      { v: "post", t: "Opslag", d: "Ét billede", o: "Flere billeder? Vælg Karrusel." },
+      { v: "carousel", t: "Karrusel", d: "Flere billeder eller videoer" },
+      { v: "reel", t: "Reel", d: "Video", o: "Alle videoer på Instagram er reels." },
+      { v: "story", t: "Story", d: "Forsvinder efter 24 timer" },
+      { v: "link_in_bio", t: "Link i bio", d: "Linket på profilen" }
+    ],
+    linkedin: [
+      { v: "post", t: "Opslag", d: "Tekst, billede eller link" },
+      { v: "document", t: "Karrusel", d: "PDF, man bladrer i" },
+      { v: "video", t: "Video", d: "Video i feedet" },
+      { v: "article", t: "Artikel", d: "Længere tekst på LinkedIn" }
+    ],
+    meta_paid: [
+      { v: "image", t: "Billede", d: "Enkelt billede", o: "Kører også i story og reels. Placeringen kommer med automatisk." },
+      { v: "video", t: "Video", d: "Enkelt video", o: "Kører også som reel og story. Placeringen kommer med automatisk." },
+      { v: "carousel", t: "Karrusel", d: "Flere billeder eller videoer" },
+      { v: "collection", t: "Collection", d: "Forside med flere billeder" },
+      { v: "leadcard", t: "Lead-annonce", d: "Formular i Meta", o: "Kan være billede eller video. Vælg Lead-annonce." }
+    ],
+    linkedin_paid: [
+      { v: "image", t: "Billede", d: "Enkelt billede" },
+      { v: "video", t: "Video", d: "Enkelt video" },
+      { v: "carousel", t: "Karrusel", d: "Flere billeder", o: "Karrusel er billeder. Er det en PDF, vælg Dokument." },
+      { v: "document", t: "Dokument", d: "PDF i feedet" },
+      { v: "leadcard", t: "Lead-annonce", d: "Formular i LinkedIn", o: "Kan være billede eller video. Vælg Lead-annonce." },
+      { v: "message", t: "Besked", d: "Sendes i indbakken" }
     ],
     print: [{ v: "poster", t: "Poster" }, { v: "flyer", t: "Flyer" }],
     internal: [{ v: "banner", t: "Banner" }, { v: "popup", t: "Popup" }]
@@ -226,7 +254,11 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function ch() { return CHANNELS.filter(function (c) { return c.v === s.channel; })[0]; }
   function isSocial() { var c = ch(); return !!(c && c.social); }
   function medium() { var c = ch(); if (!c) return null; return c.social ? (s.paid ? "paid-social" : "organic") : c.medium; }
-  function formats() { var c = ch(); if (!c) return []; if (c.social) return s.paid ? FORMATS.paid : FORMATS.organic; return FORMATS[c.medium]; }
+  function formats() {
+    var c = ch(); if (!c) return [];
+    if (c.social) return s.paid ? (c.v === "linkedin" ? FORMATS.linkedin_paid : FORMATS.meta_paid) : FORMATS[c.v];
+    return FORMATS[c.medium];
+  }
   function isEmail() { return medium() === "email"; }
   function isGift() { return s.flow === "gift"; }
   function gift() { return GIFTS.filter(function (g) { return g.v === s.gift; })[0]; }
@@ -271,7 +303,9 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function h(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function opt(item, selected, onPick, extra) {
     var b = h("button", "opt" + (selected ? " sel" : "") + (extra ? " " + extra : "")); b.type = "button";
-    b.appendChild(h("span", "t", item.t));
+    var tt = h("span", "tt"); tt.appendChild(h("span", "t", item.t));
+    if (item.o) tt.appendChild(h("span", "ov", item.o));
+    b.appendChild(tt);
     b.appendChild(h("span", "d", item.d || ""));
     b.addEventListener("click", onPick);
     return b;
@@ -502,7 +536,8 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       c1.appendChild(dl); cols.appendChild(c1);
       if (isSocial() && s.paid) {
         var c2 = h("div"); c2.appendChild(h("h2", null, "Annonce i Ads Manager? Sæt dette under URL-parametre"));
-        var adsParams = "utm_source=" + s.channel + "&utm_medium=paid-social&utm_campaign=" + campaign() + "&utm_content={{ad.name}}";
+        var adsParams = "utm_source=" + s.channel + "&utm_medium=paid-social&utm_campaign=" + campaign() + "&utm_content={{ad.name}}"
+          + (s.channel === "linkedin" ? "" : "&utm_term={{placement}}");
         Object.keys(codes).forEach(function (k) { adsParams += "&" + k + "=" + codes[k]; });
         c2.appendChild(h("p", "adscode", adsParams));
         cols.appendChild(c2);

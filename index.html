@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Linkbygger</title>
-  <meta name="description" content="Byg links til msf.dk med faste UTM-koder.">
+  <meta name="description" content="Byg links til MSF.DK med faste UTM-koder.">
   <meta name="robots" content="noindex">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -117,13 +117,9 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   .opt .d { grid-column: 1; grid-row: 2; text-align: left; font-size: 16px; }
   .top, .trail, .back, .small, .ok { font-size: 17px; }
 }
-.tabs { display: flex; flex-wrap: wrap; gap: 8px 32px; border-top: 1px solid var(--hair); padding-top: 18px; }
-.tab { display: grid; gap: 2px; color: var(--soft); font-size: 18px; }
-.tab.on { color: var(--ink); }
-.tab:not(:disabled):hover { color: var(--ink); }
-.tab:disabled { cursor: default; }
-.tab:disabled .tl { text-decoration: line-through; }
-.tab small { font-size: 15px; color: var(--soft); }
+.opt.off { cursor: default; }
+.opt.off:hover { background: none; }
+.opt.off .t { text-decoration: line-through; color: var(--soft); }
 .theme { position: fixed; top: 18px; right: clamp(16px, 3vw, 40px); z-index: 10; font-size: 16px; color: var(--soft);
   border: 1px solid var(--hair); border-radius: 999px; padding: 8px 14px; background: var(--paper); }
 .theme:hover { color: var(--ink); border-color: var(--ink); }
@@ -152,7 +148,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       <div class="meta" id="meta"></div>
     </header>
     <main class="stage" id="stage" aria-live="polite"></main>
-    <nav class="tabs" id="tabs" aria-label="Værktøjer"></nav>
   </div>
 <script>
 (function () {
@@ -161,8 +156,8 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     { v: "instagram", t: "Instagram", d: "Opslag, story, reel, bio", social: true },
     { v: "linkedin", t: "LinkedIn", d: "Opslag, annonce", social: true },
     { v: "newsletter", t: "Nyhedsbrev", d: "Mail", medium: "email" },
-    { v: "outdoor", t: "Plakat og print", d: "QR-kode, trykt link", medium: "print" },
-    { v: "msf-web", t: "msf.dk", d: "Banner, popup", medium: "internal" }
+    { v: "outdoor", t: "Poster og print", d: "QR-kode, trykt link", medium: "print" },
+    { v: "msf-web", t: "MSF.DK", d: "Banner, popup", medium: "internal" }
   ];
   var FORMATS = {
     organic: [
@@ -173,7 +168,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       { v: "video", t: "Video" }, { v: "image", t: "Billede" },
       { v: "leadcard", t: "Lead-annonce", d: "Formular i Meta" }, { v: "carousel", t: "Karrusel" }
     ],
-    print: [{ v: "plakat", t: "Plakat" }, { v: "flyer", t: "Flyer" }],
+    print: [{ v: "poster", t: "Poster" }, { v: "flyer", t: "Flyer" }],
     internal: [{ v: "banner", t: "Banner" }, { v: "popup", t: "Popup" }]
   };
   var CAMPAIGNS = [
@@ -267,7 +262,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     if (!/^https?:\/\//i.test(raw)) raw = "https://" + raw;
     try {
       var u = new URL(raw);
-      if (!/(^|\.)msf\.dk$/i.test(u.hostname)) return { url: null, err: "Linket skal gå til msf.dk." };
+      if (!/(^|\.)msf\.dk$/i.test(u.hostname)) return { url: null, err: "Linket skal gå til MSF.DK." };
       u.protocol = "https:";
       return { url: u, err: "" };
     } catch (e) { return { url: null, err: "Det ligner ikke en webadresse. Kopiér hele adressen fra browseren." }; }
@@ -333,6 +328,14 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       CHANNELS.forEach(function (c) {
         l.appendChild(opt(c, s.channel === c.v, function () { if (s.channel !== c.v) { s.channel = c.v; s.paid = null; s.format = null; } next(); }));
       });
+      if (!isGift()) {
+        var gr = opt({ t: "Gavebeviser", d: GIFTS_READY ? "Link til et gavebevis" : "Tilgår snarest" }, false, function () {
+          if (!GIFTS_READY) return;
+          s = fresh(); s.flow = "gift"; draw(true);
+        }, GIFTS_READY ? "" : "off");
+        gr.disabled = !GIFTS_READY;
+        l.appendChild(gr);
+      }
       stage.appendChild(l);
     }
 
@@ -409,12 +412,10 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
 
       if (st === "codes" && !s.mode) {
         stage.appendChild(h("h1", null, "Kampagnekoder"));
-        stage.appendChild(h("p", "sub", isEmail()
-          ? "Tomt felt giver standardkoden: " + DEFAULT_CODE_ONE + " for One-off og " + DEFAULT_CODE_FP + " for Feltpartner."
-          : "Udfyld én, begge eller ingen."));
+        stage.appendChild(h("p", "sub", "Udfyld én, begge eller ingen."));
         var fk = h("div", "form");
-        fk.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; }, 4, "Indtast kampagnekode"));
-        fk.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; }, 4, "Indtast kampagnekode"));
+        fk.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; }, 4, isEmail() ? "Hvis ingen valgt: " + DEFAULT_CODE_ONE : "Indtast kampagnekode"));
+        fk.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; }, 4, isEmail() ? "Hvis ingen valgt: " + DEFAULT_CODE_FP : "Indtast kampagnekode"));
         var nk = h("button", "go", "Videre"); nk.type = "button";
         nk.addEventListener("click", next);
         fk.appendChild(nk);
@@ -427,7 +428,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       stage.appendChild(h("h1", null, "Hvor skal brugeren lande?"));
       var fm2 = h("div", "form");
       var f1 = h("div", "field");
-      var ul = h("label", null, "Side på msf.dk. Kopiér adressen fra browseren."); ul.htmlFor = "url";
+      var ul = h("label", null, "Side på MSF.DK. Kopiér adressen fra browseren."); ul.htmlFor = "url";
       var u = document.createElement("input"); u.id = "url"; u.type = "url"; u.placeholder = "msf.dk/stoet"; u.autocomplete = "off"; u.spellcheck = false; u.value = s.url;
       var err = h("p", "err"); err.hidden = true;
       f1.appendChild(ul); f1.appendChild(u); f1.appendChild(err);
@@ -509,27 +510,17 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       stage.appendChild(cols);
     }
 
-    if (s.step > 0) {
+    if (s.step > 0 || isGift()) {
       var back = h("button", "back", "Tilbage"); back.type = "button";
-      back.addEventListener("click", function () { if (s.mode) { s.mode = null; draw(true); } else go(s.step - 1); });
+      back.addEventListener("click", function () {
+        if (s.mode) { s.mode = null; draw(true); }
+        else if (s.step === 0) { s = fresh(); draw(true); }
+        else go(s.step - 1);
+      });
       stage.appendChild(back);
     }
   }
 
-  function drawTabs() {
-    var nav = $("tabs"); nav.innerHTML = "";
-    function tab(key, text, sub, enabled) {
-      var b = h("button", "tab" + (s.flow === key ? " on" : "")); b.type = "button";
-      b.appendChild(h("span", "tl", text));
-      if (sub) b.appendChild(h("small", null, sub));
-      b.disabled = !enabled;
-      if (s.flow === key) b.setAttribute("aria-current", "page");
-      b.addEventListener("click", function () { if (s.flow === key) return; s = fresh(); s.flow = key; draw(true); drawTabs(); });
-      nav.appendChild(b);
-    }
-    tab("link", "Link", null, true);
-    tab("gift", "Gavebeviser", GIFTS_READY ? null : "Tilgår snarest", GIFTS_READY);
-  }
 
   var T = window.linkbyggerTheme, NAMES = { auto: "Auto", light: "Lys", dark: "Mørk" }, ORDER = ["auto", "light", "dark"];
   function themeLabel() { $("theme").textContent = "Tema: " + NAMES[T.pref()]; }
@@ -539,7 +530,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   });
   themeLabel();
 
-  drawTabs();
   draw(false);
 })();
 </script>

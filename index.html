@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Linkbygger</title>
-  <meta name="description" content="Byg links til MSF.DK med faste UTM-koder.">
+  <meta name="description" content="">
   <meta name="robots" content="noindex">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -159,7 +159,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     { v: "instagram", t: "Instagram", d: "Opslag, story, reel, bio", social: true },
     { v: "linkedin", t: "LinkedIn", d: "Opslag, annonce", social: true },
     { v: "sfmc", t: "Nyhedsbrev", d: "Mail fra SFMC", medium: "email" },
-    { v: "outdoor", t: "Poster og print", d: "QR-kode, trykt link", medium: "print" },
+    { v: "print", t: "Print og outdoor", d: "Brev, Journalen, outdoor, avisannonce", print: true },
     { v: "msf-web", t: "MSF.DK", d: "Banner, popup", medium: "internal" }
   ];
   var FORMATS = {
@@ -198,7 +198,19 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       { v: "leadcard", t: "Lead-annonce", d: "Formular i LinkedIn", o: "Kan være billede eller video. Vælg Lead-annonce." },
       { v: "message", t: "Besked", d: "Sendes i indbakken" }
     ],
-    print: [{ v: "poster", t: "Poster" }, { v: "flyer", t: "Flyer" }],
+    printOwn: [
+      { v: "journalen", t: "Journalen", d: "Medlemsbladet" },
+      { v: "brev", t: "Brev", d: "Høstbrev, julebrev, andre breve" },
+      { v: "gocard", t: "Go-card", d: "Gratis postkort" },
+      { v: "flyer", t: "Flyer", d: "Flyer, folder" },
+      { v: "outdoor", t: "Outdoor", d: "I det offentlige rum" }
+    ],
+    printPaid: [
+      { v: "politiken", t: "Politiken" }, { v: "jyllandsposten", t: "Jyllands-Posten" },
+      { v: "information", t: "Information" }, { v: "weekendavisen", t: "Weekendavisen" },
+      { v: "kristeligt-dagblad", t: "Kristeligt Dagblad" },
+      { v: "__other", t: "Andet medie", d: "Skriv navnet" }
+    ],
     internal: [{ v: "banner", t: "Banner" }, { v: "popup", t: "Popup" }]
   };
   var CAMPAIGNS = [
@@ -225,7 +237,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
 
   var s = fresh();
   function fresh() {
-    return { channel: null, paid: null, format: null, campaign: null,
+    return { channel: null, paid: null, format: null, other: "", qr: null, campaign: null,
       codeOne: "", codeFp: "",
       useAmounts: null, amtOne: ["", "", ""], amtRec: ["", "", ""],
       url: "", topic: "", mailCampaign: "", step: 0, mode: null, flow: "link", gift: null };
@@ -255,12 +267,20 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   }
   function ch() { return CHANNELS.filter(function (c) { return c.v === s.channel; })[0]; }
   function isSocial() { var c = ch(); return !!(c && c.social); }
-  function medium() { var c = ch(); if (!c) return null; return c.social ? (s.paid ? "paid-social" : "organic") : c.medium; }
+  function isPrint() { var c = ch(); return !!(c && c.print); }
+  function medium() {
+    var c = ch(); if (!c) return null;
+    if (c.social) return s.paid ? "paid-social" : "organic";
+    if (c.print) return s.paid ? "print-paid" : "print";
+    return c.medium;
+  }
   function formats() {
     var c = ch(); if (!c) return [];
     if (c.social) return s.paid ? (c.v === "linkedin" ? FORMATS.linkedin_paid : FORMATS.meta_paid) : FORMATS[c.v];
+    if (c.print) return s.paid ? FORMATS.printPaid : FORMATS.printOwn;
     return FORMATS[c.medium];
   }
+  function source() { return isPrint() ? (s.format === "__other" ? clean(s.other) : s.format) : s.channel; }
   function isEmail() { return medium() === "email"; }
   function isGift() { return s.flow === "gift"; }
   function gift() { return GIFTS.filter(function (g) { return g.v === s.gift; })[0]; }
@@ -268,7 +288,8 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function content() {
     if (isGift()) return s.gift;
     if (isEmail()) return null;
-    var t = clean(s.topic); return s.format ? (t ? s.format + "_" + t : s.format) : null;
+    var t = clean(s.topic), base = isPrint() ? s.qr : s.format;
+    return base ? (t ? base + "_" + t : base) : null;
   }
 
   function steps() {
@@ -279,8 +300,10 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       return g;
     }
     var l = ["channel"];
-    if (!s.channel || isSocial()) l.push("paid");
-    if (!isEmail()) l.push("format", "campaign");
+    if (!s.channel || isSocial() || isPrint()) l.push("paid");
+    if (!isEmail()) l.push("format");
+    if (isPrint()) l.push("qr");
+    if (!isEmail()) l.push("campaign");
     l.push("codes");
     l.push("url", "done");
     return l;
@@ -316,8 +339,12 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function label(key) {
     if (key === "gift") return gift().t;
     if (key === "channel") return ch().t;
-    if (key === "paid") return s.paid ? "Annonce" : "Organisk";
-    if (key === "format") { var f = formats().filter(function (x) { return x.v === s.format; })[0]; return f ? f.t : ""; }
+    if (key === "paid") return isPrint() ? (s.paid ? "Købt plads" : "Egen tryksag") : (s.paid ? "Annonce" : "Organisk");
+    if (key === "format") {
+      if (s.format === "__other") return clean(s.other);
+      var f = formats().filter(function (x) { return x.v === s.format; })[0]; return f ? f.t : "";
+    }
+    if (key === "qr") return s.qr === "qr" ? "QR-kode" : "Trykt link";
     if (key === "campaign") return s.campaign === "evergreen" ? "Ingen kampagne" : campaign();
     if (key === "amounts") {
       var ea = extras(), a = [ea["donation-amounts"], ea["donation-amounts-recurring"]].filter(Boolean);
@@ -377,18 +404,46 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     }
 
     if (st === "paid") {
-      stage.appendChild(h("h1", null, "Betaler vi for at vise det?"));
+      var pr = isPrint();
+      stage.appendChild(h("h1", null, pr ? "Har vi købt pladsen?" : "Betaler vi for at vise det?"));
       var l2 = h("div", "list");
-      l2.appendChild(opt({ t: "Nej", d: "Almindeligt opslag" }, s.paid === false, function () { if (s.paid !== false) s.format = null; s.paid = false; next(); }));
-      l2.appendChild(opt({ t: "Ja", d: "Annonce eller boost" }, s.paid === true, function () { if (s.paid !== true) s.format = null; s.paid = true; next(); }));
+      l2.appendChild(opt(pr ? { t: "Nej", d: "Egne tryksager og outdoor" } : { t: "Nej", d: "Almindeligt opslag" }, s.paid === false, function () { if (s.paid !== false) s.format = null; s.paid = false; next(); }));
+      l2.appendChild(opt(pr ? { t: "Ja", d: "Annonce eller indstik i avis og magasin" } : { t: "Ja", d: "Annonce eller boost" }, s.paid === true, function () { if (s.paid !== true) s.format = null; s.paid = true; next(); }));
       stage.appendChild(l2);
     }
 
     if (st === "format") {
-      stage.appendChild(h("h1", null, "Hvad slags " + (isSocial() ? (s.paid ? "annonce" : "opslag") : "indhold") + "?"));
+      var head = isPrint() ? (s.paid ? "Hvilket medie?" : "Hvilken tryksag?") : "Hvad slags " + (isSocial() ? (s.paid ? "annonce" : "opslag") : "indhold") + "?";
+      stage.appendChild(h("h1", null, head));
       var l3 = h("div", "list");
-      formats().forEach(function (f) { l3.appendChild(opt(f, s.format === f.v, function () { s.format = f.v; next(); })); });
+      formats().forEach(function (f) {
+        l3.appendChild(opt(f, s.format === f.v, function () {
+          s.format = f.v;
+          if (f.v === "__other") { draw(false); var oi = $("other"); if (oi) oi.focus(); } else next();
+        }));
+      });
       stage.appendChild(l3);
+      if (s.format === "__other") {
+        var fo = h("div", "form"), ff = h("div", "field");
+        var ol = h("label", null, "Mediets navn"); ol.htmlFor = "other";
+        var oin = document.createElement("input"); oin.id = "other"; oin.type = "text"; oin.placeholder = "Samvirke"; oin.autocomplete = "off"; oin.value = s.other;
+        var ob = h("button", "go", "Videre"); ob.type = "button";
+        function updO() { ob.disabled = !clean(oin.value); }
+        oin.addEventListener("input", function () { s.other = oin.value; updO(); });
+        oin.addEventListener("keydown", function (e) { if (e.key === "Enter" && clean(oin.value)) next(); });
+        ob.addEventListener("click", next);
+        ff.appendChild(ol); ff.appendChild(oin);
+        fo.appendChild(ff); fo.appendChild(ob);
+        stage.appendChild(fo); updO();
+      }
+    }
+
+    if (st === "qr") {
+      stage.appendChild(h("h1", null, "Hvordan kommer folk ind på siden?"));
+      var lq = h("div", "list");
+      lq.appendChild(opt({ t: "QR-kode", d: "Koden scannes" }, s.qr === "qr", function () { s.qr = "qr"; next(); }));
+      lq.appendChild(opt({ t: "Trykt link", d: "Adressen skrives af" }, s.qr === "link", function () { s.qr = "link"; next(); }));
+      stage.appendChild(lq);
     }
 
     if (st === "campaign") {
@@ -496,7 +551,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
 
     if (st === "done" && !s.mode) {
       var p = parseUrl(s.url).url;
-      var vals = { utm_source: s.channel, utm_medium: medium(), utm_campaign: campaign(), utm_content: content() };
+      var vals = { utm_source: source(), utm_medium: medium(), utm_campaign: campaign(), utm_content: content() };
       Object.keys(vals).forEach(function (k) { if (!vals[k]) delete vals[k]; });
       var codes = extras();
       Object.keys(codes).forEach(function (k) { p.searchParams.set(k, codes[k]); });
@@ -554,6 +609,11 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         Object.keys(codes).forEach(function (k) { adsParams += "&" + k + "=" + codes[k]; });
         c2.appendChild(h("p", "adscode", adsParams));
         cols.appendChild(c2);
+      }
+      if (isPrint() && s.qr === "link") {
+        var c3 = h("div"); c3.appendChild(h("h2", null, "Trykt link? Lav en kort adresse"));
+        c3.appendChild(h("p", "sub", "Tryk en kort adresse, fx msf.dk/" + (campaign() && campaign() !== "evergreen" ? campaign() : "jul26") + ", og lad den videresende til linket ovenfor. Brug en ny kort adresse til hver udsendelse."));
+        cols.appendChild(c3);
       }
       stage.appendChild(cols);
     }

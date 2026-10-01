@@ -476,14 +476,21 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       var t = document.createElement("input"); t.id = tkey; t.type = "text"; t.placeholder = mail ? "Gaza" : "Sudan"; t.autocomplete = "off"; t.value = s[tkey];
       f2.appendChild(tl); f2.appendChild(t);
       var mk = h("button", "go", "Lav link"); mk.type = "button";
-      function check() { var p = parseUrl(u.value), msg = p.err || p.warn || ""; err.hidden = !msg; err.textContent = msg; mk.disabled = !p.url; }
-      u.addEventListener("input", function () { s.url = u.value; check(); });
+      var warned = false;
+      function reset() { warned = false; err.hidden = true; mk.textContent = "Lav link"; mk.disabled = !u.value.trim(); }
+      function submit() {
+        var p = parseUrl(u.value);
+        if (p.err) { err.textContent = p.err; err.hidden = false; return; }
+        if (p.warn && !warned) { warned = true; err.textContent = p.warn; err.hidden = false; mk.textContent = "Ja, lav link"; return; }
+        next();
+      }
+      u.addEventListener("input", function () { s.url = u.value; reset(); });
       t.addEventListener("input", function () { s[tkey] = t.value; });
-      [u, t].forEach(function (el) { el.addEventListener("keydown", function (e) { if (e.key === "Enter" && !mk.disabled) next(); }); });
-      mk.addEventListener("click", next);
+      [u, t].forEach(function (el) { el.addEventListener("keydown", function (e) { if (e.key === "Enter" && !mk.disabled) submit(); }); });
+      mk.addEventListener("click", submit);
       fm2.appendChild(f1); fm2.appendChild(f2); fm2.appendChild(mk);
       stage.appendChild(fm2);
-      check();
+      reset();
       setTimeout(function () { u.focus(); }, 0);
     }
 

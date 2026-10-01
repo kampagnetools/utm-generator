@@ -82,6 +82,8 @@ h1 { margin: 0; font-weight: 500; font-size: clamp(34px, 5vw, 60px); line-height
 .amt:focus-within { border-bottom-color: var(--red); }
 .amt input { border: 0; padding: 6px 0 10px; min-width: 0; }
 .amt span { color: var(--soft); font-size: 18px; }
+.amtcell { display: grid; gap: 6px; min-width: 0; }
+.amtcell small { font-size: 14px; color: var(--soft); letter-spacing: 0; }
 
 
 .go { font-size: 18px; font-weight: 500; letter-spacing: 0; line-height: 1; justify-self: start;
@@ -295,7 +297,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     if (!/^https?:\/\//i.test(raw)) raw = "https://" + raw;
     try {
       var u = new URL(raw);
-      if (!/(^|\.)msf\.dk$/i.test(u.hostname)) return { url: null, err: "Linket skal gå til MSF.DK." };
+      if (!/(^|\.)msf\.dk$/i.test(u.hostname)) return { url: u, err: "", warn: "Er du sikker på, at linket ikke skal pege på msf.dk?" };
       u.protocol = "https:";
       return { url: u, err: "" };
     } catch (e) { return { url: null, err: "Det ligner ikke en webadresse. Kopiér hele adressen fra browseren." }; }
@@ -419,7 +421,8 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
           ai.addEventListener("input", function () { var d = digits(ai.value).slice(0, 6); if (d !== ai.value) ai.value = d; s[key][i] = d; });
           ai.addEventListener("keydown", function (e) { if (e.key === "Enter") next(); });
           var cell = h("div", "amt"); cell.appendChild(ai); cell.appendChild(h("span", null, "kr."));
-          row.appendChild(cell);
+          var wrap = h("div", "amtcell"); wrap.appendChild(cell); wrap.appendChild(h("small", null, ["Lav", "Optimal", "Høj"][i]));
+          row.appendChild(wrap);
         });
         fd.appendChild(row);
         return fd;
@@ -473,7 +476,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       var t = document.createElement("input"); t.id = tkey; t.type = "text"; t.placeholder = mail ? "Gaza" : "Sudan"; t.autocomplete = "off"; t.value = s[tkey];
       f2.appendChild(tl); f2.appendChild(t);
       var mk = h("button", "go", "Lav link"); mk.type = "button";
-      function check() { var p = parseUrl(u.value); err.hidden = !p.err; err.textContent = p.err; mk.disabled = !p.url; }
+      function check() { var p = parseUrl(u.value), msg = p.err || p.warn || ""; err.hidden = !msg; err.textContent = msg; mk.disabled = !p.url; }
       u.addEventListener("input", function () { s.url = u.value; check(); });
       t.addEventListener("input", function () { s[tkey] = t.value; });
       [u, t].forEach(function (el) { el.addEventListener("keydown", function (e) { if (e.key === "Enter" && !mk.disabled) next(); }); });

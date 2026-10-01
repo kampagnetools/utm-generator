@@ -156,7 +156,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     { v: "facebook", t: "Facebook", d: "Opslag, story, annonce", social: true },
     { v: "instagram", t: "Instagram", d: "Opslag, story, reel, bio", social: true },
     { v: "linkedin", t: "LinkedIn", d: "Opslag, annonce", social: true },
-    { v: "newsletter", t: "Nyhedsbrev", d: "Mail", medium: "email" },
+    { v: "sfmc", t: "Nyhedsbrev", d: "Mail fra SFMC", medium: "email" },
     { v: "outdoor", t: "Poster og print", d: "QR-kode, trykt link", medium: "print" },
     { v: "msf-web", t: "MSF.DK", d: "Banner, popup", medium: "internal" }
   ];
@@ -226,7 +226,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     return { channel: null, paid: null, format: null, campaign: null,
       codeOne: "", codeFp: "",
       useAmounts: null, amtOne: ["", "", ""], amtRec: ["", "", ""],
-      url: "", topic: "", step: 0, mode: null, flow: "link", gift: null };
+      url: "", topic: "", mailCampaign: "", step: 0, mode: null, flow: "link", gift: null };
   }
   function digits(x) { return (x || "").replace(/\D/g, ""); }
   function amountList(arr) { return arr.map(digits).filter(function (a) { return a && +a > 0; }).join(","); }
@@ -262,10 +262,11 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function isEmail() { return medium() === "email"; }
   function isGift() { return s.flow === "gift"; }
   function gift() { return GIFTS.filter(function (g) { return g.v === s.gift; })[0]; }
-  function campaign() { return isGift() ? "gavebevis" : isEmail() ? "evergreen" : s.campaign; }
+  function campaign() { return isGift() ? "gavebevis" : isEmail() ? (clean(s.mailCampaign) || null) : s.campaign; }
   function content() {
     if (isGift()) return s.gift;
-    var f = isEmail() ? "nyhedsbrev" : s.format, t = clean(s.topic); return f ? (t ? f + "_" + t : f) : null;
+    if (isEmail()) return null;
+    var t = clean(s.topic); return s.format ? (t ? s.format + "_" + t : s.format) : null;
   }
 
   function steps() {
@@ -467,13 +468,14 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       var err = h("p", "err"); err.hidden = true;
       f1.appendChild(ul); f1.appendChild(u); f1.appendChild(err);
       var f2 = h("div", "field");
-      var tl = h("label", null, "Emne, valgfrit"); tl.htmlFor = "topic";
-      var t = document.createElement("input"); t.id = "topic"; t.type = "text"; t.placeholder = "Sudan"; t.autocomplete = "off"; t.value = s.topic;
+      var mail = isEmail(), tkey = mail ? "mailCampaign" : "topic";
+      var tl = h("label", null, mail ? "Kampagne, valgfrit" : "Emne, valgfrit"); tl.htmlFor = tkey;
+      var t = document.createElement("input"); t.id = tkey; t.type = "text"; t.placeholder = mail ? "Gaza" : "Sudan"; t.autocomplete = "off"; t.value = s[tkey];
       f2.appendChild(tl); f2.appendChild(t);
       var mk = h("button", "go", "Lav link"); mk.type = "button";
       function check() { var p = parseUrl(u.value); err.hidden = !p.err; err.textContent = p.err; mk.disabled = !p.url; }
       u.addEventListener("input", function () { s.url = u.value; check(); });
-      t.addEventListener("input", function () { s.topic = t.value; });
+      t.addEventListener("input", function () { s[tkey] = t.value; });
       [u, t].forEach(function (el) { el.addEventListener("keydown", function (e) { if (e.key === "Enter" && !mk.disabled) next(); }); });
       mk.addEventListener("click", next);
       fm2.appendChild(f1); fm2.appendChild(f2); fm2.appendChild(mk);
@@ -485,6 +487,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     if (st === "done" && !s.mode) {
       var p = parseUrl(s.url).url;
       var vals = { utm_source: s.channel, utm_medium: medium(), utm_campaign: campaign(), utm_content: content() };
+      Object.keys(vals).forEach(function (k) { if (!vals[k]) delete vals[k]; });
       var codes = extras();
       Object.keys(codes).forEach(function (k) { p.searchParams.set(k, codes[k]); });
       Object.keys(vals).forEach(function (k) { p.searchParams.set(k, vals[k]); });
@@ -516,7 +519,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       });
       var same = h("button", "small", "Samme kampagne, ny kanal"); same.type = "button";
       same.addEventListener("click", function () { var keep = { campaign: s.campaign, codeOne: s.codeOne, codeFp: s.codeFp,
-        useAmounts: s.useAmounts, amtOne: s.amtOne.slice(), amtRec: s.amtRec.slice(), url: s.url, topic: s.topic }; s = fresh(); Object.assign(s, keep); draw(true); });
+        useAmounts: s.useAmounts, amtOne: s.amtOne.slice(), amtRec: s.amtRec.slice(), url: s.url, topic: s.topic, mailCampaign: s.mailCampaign }; s = fresh(); Object.assign(s, keep); draw(true); });
       var nw = h("button", "small", "Start forfra"); nw.type = "button";
       nw.addEventListener("click", function () { var fl = s.flow; s = fresh(); s.flow = fl; draw(true); });
       acts.appendChild(cp); acts.appendChild(ok); acts.appendChild(same); acts.appendChild(nw);

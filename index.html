@@ -222,21 +222,10 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   var CAMPAIGNS = [
     { v: "evergreen", t: "Nej", d: "Almindeligt indhold" },
     { v: "eoy2026", t: "eoy2026", d: "End of Year 2026" },
-    { v: "eoy2026", t: "eoy2026 gavebevis", d: "Gavebevis i webshoppen", gift: true }
+    { v: "eoy2026", t: "Gavebevis eoy2026", d: "Gavebevis", gift: true }
   ];
 
-  var GIFTS = [
-    { v: "alle", t: "Alle gavebeviser", d: "Oversigten", path: "/produkt-kategori/gavebeviser/" },
-    { v: "valgfrit_tekst", t: "Valgfrit beløb og tekst", d: "Print selv", path: "/produkt/gavebevis-print-selv-valgfrit-beloeb-og-tekst/" },
-    { v: "uden_beloeb", t: "Valgfrit beløb, uden synligt beløb", d: "Print selv", path: "/produkt/gavebevis-valgfrit-beloeb-og-tekst-uden-synligt-beloeb/" },
-    { v: "foedselskit", t: "Fødselskit", d: "Print selv", path: "/produkt/foedselskit/" },
-    { v: "boernevaccination", t: "Børnevaccination", d: "Print selv", path: "/produkt/boernevaccination/" },
-    { v: "kirurg", t: "Udstyr til kirurgen", d: "Print selv", path: "/produkt/udstyr-til-kirurgen/" },
-    { v: "malaria", t: "Malaria-behandling", d: "Print selv", path: "/produkt/malaria-behandling/" },
-    { v: "vand", t: "Vand- og sanitetskit", d: "Print selv", path: "/produkt/vand-og-sanitetskit/" },
-    { v: "kanyler", t: "Sterile kanyler", d: "Print selv", path: "/produkt/sterile-kanyler/" },
-    { v: "gift_certificate", t: "Gift certificate", d: "Engelsk", path: "/produkt/gift-certificate-printable-optional-donation-amount-and-text/" }
-  ];
+  var GIFT_URL = "https://msf.dk/produkt-kategori/gavebeviser/";
   var DEFAULT_CODE_ONE = "2822", DEFAULT_CODE_FP = "2824", DEFAULT_CODE_GIFT = "2472";
 
   var s = fresh();
@@ -244,7 +233,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     return { channel: null, paid: null, format: null, other: "", qr: null, campaign: null,
       codeOne: "", codeFp: "", codeGift: "",
       useAmounts: null, amtOne: ["", "", ""], amtRec: ["", "", ""],
-      url: "", topic: "", mailCampaign: "", step: 0, mode: null, target: null, gift: null };
+      url: "", topic: "", mailCampaign: "", step: 0, mode: null, target: null };
   }
   function digits(x) { return (x || "").replace(/\D/g, ""); }
   function amountList(arr) { return arr.map(digits).filter(function (a) { return a && +a > 0; }).join(","); }
@@ -288,7 +277,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function source() { return isPrint() ? (s.format === "__other" ? clean(s.other) : s.format) : s.channel; }
   function isEmail() { return medium() === "email"; }
   function isGift() { return s.target === "gift"; }
-  function gift() { return GIFTS.filter(function (g) { return g.v === s.gift; })[0]; }
   function campaign() {
     if (s.campaign && s.campaign !== "evergreen") return s.campaign;
     return isEmail() ? (clean(s.mailCampaign) || null) : s.campaign;
@@ -306,7 +294,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     if (!isEmail()) l.push("format");
     if (isPrint()) l.push("qr");
     l.push("campaign");
-    if (isGift()) l.push("gift", "codes", "done");
+    if (isGift()) l.push("codes", "done");
     else l.push("codes", "url", "done");
     return l;
   }
@@ -339,7 +327,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     return b;
   }
   function label(key) {
-    if (key === "gift") return gift().t;
     if (key === "channel") return ch().t;
     if (key === "paid") return isPrint() ? (s.paid ? "Købt plads" : "Egen tryksag") : (s.paid ? "Annonce" : "Organisk");
     if (key === "format") {
@@ -347,7 +334,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       var f = formats().filter(function (x) { return x.v === s.format; })[0]; return f ? f.t : "";
     }
     if (key === "qr") return s.qr === "qr" ? "QR-kode" : "Trykt link";
-    if (key === "campaign") return s.campaign === "evergreen" ? "Ingen kampagne" : campaign() + (isGift() ? " gavebevis" : "");
+    if (key === "campaign") return s.campaign === "evergreen" ? "Ingen kampagne" : (isGift() ? "Gavebevis " : "") + campaign();
     if (key === "amounts") {
       var ea = extras(), a = [ea["donation-amounts"], ea["donation-amounts-recurring"]].filter(Boolean);
       return a.length ? "Beløb " + a.join(" · ") : "Standardbeløb";
@@ -379,15 +366,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       trail.appendChild(b);
     });
     stage.appendChild(trail);
-
-    if (st === "gift") {
-      stage.appendChild(h("h1", null, "Hvilket gavebevis?"));
-      var lg = h("div", "list");
-      GIFTS.forEach(function (g) {
-        lg.appendChild(opt(g, s.gift === g.v, function () { s.gift = g.v; s.url = "https://msf.dk" + g.path; next(); }));
-      });
-      stage.appendChild(lg);
-    }
 
     if (st === "channel") {
       stage.appendChild(h("h1", null, "Hvor skal linket deles?"));
@@ -448,7 +426,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       CAMPAIGNS.forEach(function (c) {
         var g = !!c.gift;
         l4.appendChild(opt(c, s.campaign === c.v && g === isGift(), function () {
-          if (g !== isGift()) { s.url = ""; s.gift = null; }
+          if (g !== isGift()) s.url = g ? GIFT_URL : "";
           s.campaign = c.v; s.target = g ? "gift" : "page"; next();
         }));
       });
@@ -598,7 +576,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       var same = h("button", "small", "Samme kampagne, ny kanal"); same.type = "button";
       same.addEventListener("click", function () { var keep = { campaign: s.campaign, codeOne: s.codeOne, codeFp: s.codeFp, codeGift: s.codeGift,
         useAmounts: s.useAmounts, amtOne: s.amtOne.slice(), amtRec: s.amtRec.slice(), url: s.url, topic: s.topic, mailCampaign: s.mailCampaign,
-        target: s.target, gift: s.gift }; s = fresh(); Object.assign(s, keep); draw(true); });
+        target: s.target }; s = fresh(); Object.assign(s, keep); draw(true); });
       var nw = h("button", "small", "Start forfra"); nw.type = "button";
       nw.addEventListener("click", function () { s = fresh(); draw(true); });
       acts.appendChild(cp); acts.appendChild(ok); acts.appendChild(same); acts.appendChild(nw);

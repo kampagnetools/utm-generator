@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Linkbygger</title>
-  <meta name="description" content="">
+  <meta name="description" content="Byg links til MSF.DK med faste UTM-koder.">
   <meta name="robots" content="noindex">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -168,20 +168,25 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       { v: "carousel", t: "Karrusel", d: "Flere billeder i ét opslag" },
       { v: "video", t: "Video", d: "Længere video", o: "Overlapper med Reel. Korte videoer er reels." },
       { v: "reel", t: "Reel", d: "Kort video", o: "Vises også i feed som video." },
-      { v: "story", t: "Story", d: "Forsvinder efter 24 timer" }
+      { v: "story", t: "Story", d: "Forsvinder efter 24 timer" },
+      { v: "profil", t: "Profil", d: "Linket på profilen" },
+      { v: "cm", t: "Svar og DM", d: "Community management" }
     ],
     instagram: [
       { v: "post", t: "Opslag", d: "Ét billede", o: "Flere billeder? Vælg Karrusel." },
       { v: "carousel", t: "Karrusel", d: "Flere billeder eller videoer" },
       { v: "reel", t: "Reel", d: "Video", o: "Alle videoer på Instagram er reels." },
       { v: "story", t: "Story", d: "Forsvinder efter 24 timer" },
-      { v: "link_in_bio", t: "Link i bio", d: "Linket på profilen" }
+      { v: "profil", t: "Profil", d: "Linket på profilen" },
+      { v: "cm", t: "Svar og DM", d: "Community management" }
     ],
     linkedin: [
       { v: "post", t: "Opslag", d: "Tekst, billede eller link" },
       { v: "document", t: "Karrusel", d: "PDF, man bladrer i" },
       { v: "video", t: "Video", d: "Video i feedet" },
-      { v: "article", t: "Artikel", d: "Længere tekst på LinkedIn" }
+      { v: "article", t: "Artikel", d: "Længere tekst på LinkedIn" },
+      { v: "profil", t: "Profil", d: "Linket på profilen" },
+      { v: "cm", t: "Svar og DM", d: "Community management" }
     ],
     meta_paid: [
       { v: "image", t: "Billede", d: "Enkelt billede", o: "Kører også i story og reels. Placeringen kommer med automatisk." },
@@ -200,7 +205,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     ],
     printOwn: [
       { v: "journalen", t: "Journalen", d: "Medlemsbladet" },
-      { v: "brev", t: "Brev", d: "Høstmail, julebrev, andre breve" },
+      { v: "brev", t: "Brev", d: "Høstbrev, julebrev, andre breve" },
       { v: "gocard", t: "Go-card", d: "Gratis postkort" },
       { v: "flyer", t: "Flyer", d: "Flyer, folder" },
       { v: "outdoor", t: "Outdoor", d: "I det offentlige rum" }
@@ -221,7 +226,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   var GIFTS = [
     { v: "alle", t: "Alle gavebeviser", d: "Oversigten", path: "/produkt-kategori/gavebeviser/" },
     { v: "valgfrit_tekst", t: "Valgfrit beløb og tekst", d: "Print selv", path: "/produkt/gavebevis-print-selv-valgfrit-beloeb-og-tekst/" },
-    { v: "valgfrit", t: "Valgfrit beløb", d: "Print selv", path: "/produkt/gavebevis-print-selv-valgfrit-beloeb/" },
     { v: "uden_beloeb", t: "Valgfrit beløb, uden synligt beløb", d: "Print selv", path: "/produkt/gavebevis-valgfrit-beloeb-og-tekst-uden-synligt-beloeb/" },
     { v: "foedselskit", t: "Fødselskit", d: "Print selv", path: "/produkt/foedselskit/" },
     { v: "boernevaccination", t: "Børnevaccination", d: "Print selv", path: "/produkt/boernevaccination/" },
@@ -231,14 +235,14 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     { v: "kanyler", t: "Sterile kanyler", d: "Print selv", path: "/produkt/sterile-kanyler/" },
     { v: "gift_certificate", t: "Gift certificate", d: "Engelsk", path: "/produkt/gift-certificate-printable-optional-donation-amount-and-text/" }
   ];
-  var GIFTS_READY = false;
+  var GIFTS_READY = true;
 
-  var DEFAULT_CODE_ONE = "2822", DEFAULT_CODE_FP = "2824";
+  var DEFAULT_CODE_ONE = "2822", DEFAULT_CODE_FP = "2824", DEFAULT_CODE_GIFT = "2472";
 
   var s = fresh();
   function fresh() {
     return { channel: null, paid: null, format: null, other: "", qr: null, campaign: null,
-      codeOne: "", codeFp: "",
+      codeOne: "", codeFp: "", codeGift: "",
       useAmounts: null, amtOne: ["", "", ""], amtRec: ["", "", ""],
       url: "", topic: "", mailCampaign: "", step: 0, mode: null, flow: "link", gift: null };
   }
@@ -246,6 +250,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function amountList(arr) { return arr.map(digits).filter(function (a) { return a && +a > 0; }).join(","); }
   function extras() {
     var e = {};
+    if (isGift()) { if (digits(s.codeGift)) e.utm_campaign_code = digits(s.codeGift); return e; }
     var am = s.useAmounts && amountsAllowed();
     if (am && amountList(s.amtOne)) e["donation-amounts"] = amountList(s.amtOne);
     if (am && amountList(s.amtRec)) e["donation-amounts-recurring"] = amountList(s.amtRec);
@@ -256,7 +261,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     return e;
   }
   function isAd() { return isSocial() && s.paid === true; }
-  function amountsAllowed() { return isAd() || medium() === "email"; }
+  function amountsAllowed() { return !isGift() && (isAd() || medium() === "email"); }
   var $ = function (id) { return document.getElementById(id); };
 
   function clean(x) {
@@ -284,9 +289,12 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function isEmail() { return medium() === "email"; }
   function isGift() { return s.flow === "gift"; }
   function gift() { return GIFTS.filter(function (g) { return g.v === s.gift; })[0]; }
-  function campaign() { return isGift() ? "gavebevis" : isEmail() ? (clean(s.mailCampaign) || null) : s.campaign; }
+  function campaign() {
+    if (isGift()) return s.campaign && s.campaign !== "evergreen" ? s.campaign : "gavebevis";
+    return isEmail() ? (clean(s.mailCampaign) || null) : s.campaign;
+  }
   function content() {
-    if (isGift()) return s.gift;
+    if (isGift()) { var gb = isEmail() ? null : isPrint() ? s.qr : s.format; return gb ? gb + "_" + s.gift : s.gift; }
     if (isEmail()) return null;
     var t = clean(s.topic), base = isPrint() ? s.qr : s.format;
     return base ? (t ? base + "_" + t : base) : null;
@@ -295,8 +303,10 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function steps() {
     if (isGift()) {
       var g = ["gift", "channel"];
-      if (!s.channel || isSocial()) g.push("paid");
-      g.push("done");
+      if (!s.channel || isSocial() || isPrint()) g.push("paid");
+      if (!isEmail()) g.push("format");
+      if (isPrint()) g.push("qr");
+      g.push("campaign", "codes", "done");
       return g;
     }
     var l = ["channel"];
@@ -351,6 +361,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       return a.length ? "Beløb " + a.join(" · ") : "Standardbeløb";
     }
     if (key === "codes") {
+      if (isGift()) return "Kode " + (digits(s.codeGift) || DEFAULT_CODE_GIFT);
       var ec = extras(), k = [ec.campaign_code, ec.campaign_code_recurring].filter(Boolean);
       return k.length ? "Koder " + k.join("/") : "Ingen koder";
     }
@@ -503,7 +514,19 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         stage.appendChild(fa);
       }
 
-      if (st === "codes" && !s.mode) {
+      if (st === "codes" && !s.mode && isGift()) {
+        stage.appendChild(h("h1", null, "Kampagnekode"));
+        stage.appendChild(h("p", "sub", "Kun hvis købet skal skelnes, fx til jul. Tomt felt giver " + DEFAULT_CODE_GIFT + "."));
+        var fg = h("div", "form");
+        fg.appendChild(numField("codeGift", "Kampagnekode gavebevis", function () { return s.codeGift; }, function (v) { s.codeGift = v; }, 4, "Hvis ingen valgt: " + DEFAULT_CODE_GIFT));
+        var ng = h("button", "go", "Videre"); ng.type = "button";
+        ng.addEventListener("click", next);
+        fg.appendChild(ng);
+        stage.appendChild(fg);
+        setTimeout(function () { var i = $("codeGift"); if (i) i.focus(); }, 0);
+      }
+
+      if (st === "codes" && !s.mode && !isGift()) {
         stage.appendChild(h("h1", null, "Kampagnekoder"));
         stage.appendChild(h("p", "sub", "Udfyld én, begge eller ingen."));
         var fk = h("div", "form");
@@ -583,8 +606,9 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         try { navigator.clipboard.writeText(href).then(function () { ok.textContent = "Kopieret"; }, fallback); } catch (e) { fallback(); }
       });
       var same = h("button", "small", "Samme kampagne, ny kanal"); same.type = "button";
-      same.addEventListener("click", function () { var keep = { campaign: s.campaign, codeOne: s.codeOne, codeFp: s.codeFp,
-        useAmounts: s.useAmounts, amtOne: s.amtOne.slice(), amtRec: s.amtRec.slice(), url: s.url, topic: s.topic, mailCampaign: s.mailCampaign }; s = fresh(); Object.assign(s, keep); draw(true); });
+      same.addEventListener("click", function () { var keep = { campaign: s.campaign, codeOne: s.codeOne, codeFp: s.codeFp, codeGift: s.codeGift,
+        useAmounts: s.useAmounts, amtOne: s.amtOne.slice(), amtRec: s.amtRec.slice(), url: s.url, topic: s.topic, mailCampaign: s.mailCampaign,
+        flow: s.flow, gift: s.gift, step: isGift() ? 1 : 0 }; s = fresh(); Object.assign(s, keep); draw(true); });
       var nw = h("button", "small", "Start forfra"); nw.type = "button";
       nw.addEventListener("click", function () { var fl = s.flow; s = fresh(); s.flow = fl; draw(true); });
       acts.appendChild(cp); acts.appendChild(ok); acts.appendChild(same); acts.appendChild(nw);

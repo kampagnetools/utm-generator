@@ -221,7 +221,8 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   };
   var CAMPAIGNS = [
     { v: "evergreen", t: "Nej", d: "Almindeligt indhold" },
-    { v: "eoy2026", t: "End of Year 2026", d: "eoy2026" }
+    { v: "eoy2026", t: "eoy2026", d: "End of Year 2026" },
+    { v: "eoy2026", t: "eoy2026 gavebevis", d: "Gavebevis i webshoppen", gift: true }
   ];
 
   var GIFTS = [
@@ -288,7 +289,10 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function isEmail() { return medium() === "email"; }
   function isGift() { return s.target === "gift"; }
   function gift() { return GIFTS.filter(function (g) { return g.v === s.gift; })[0]; }
-  function campaign() { return isEmail() ? (clean(s.mailCampaign) || null) : s.campaign; }
+  function campaign() {
+    if (s.campaign && s.campaign !== "evergreen") return s.campaign;
+    return isEmail() ? (clean(s.mailCampaign) || null) : s.campaign;
+  }
   function content() {
     if (isGift()) { var gb = isEmail() ? null : isPrint() ? s.qr : s.format; return gb ? gb + "_gavebevis" : "gavebevis"; }
     if (isEmail()) return null;
@@ -301,8 +305,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     if (!s.channel || isSocial() || isPrint()) l.push("paid");
     if (!isEmail()) l.push("format");
     if (isPrint()) l.push("qr");
-    if (!isEmail()) l.push("campaign");
-    l.push("target");
+    l.push("campaign");
     if (isGift()) l.push("gift", "codes", "done");
     else l.push("codes", "url", "done");
     return l;
@@ -337,7 +340,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   }
   function label(key) {
     if (key === "gift") return gift().t;
-    if (key === "target") return isGift() ? "Gavebevis" : "Side";
     if (key === "channel") return ch().t;
     if (key === "paid") return isPrint() ? (s.paid ? "Købt plads" : "Egen tryksag") : (s.paid ? "Annonce" : "Organisk");
     if (key === "format") {
@@ -345,7 +347,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       var f = formats().filter(function (x) { return x.v === s.format; })[0]; return f ? f.t : "";
     }
     if (key === "qr") return s.qr === "qr" ? "QR-kode" : "Trykt link";
-    if (key === "campaign") return s.campaign === "evergreen" ? "Ingen kampagne" : campaign();
+    if (key === "campaign") return s.campaign === "evergreen" ? "Ingen kampagne" : campaign() + (isGift() ? " gavebevis" : "");
     if (key === "amounts") {
       var ea = extras(), a = [ea["donation-amounts"], ea["donation-amounts-recurring"]].filter(Boolean);
       return a.length ? "Beløb " + a.join(" · ") : "Standardbeløb";
@@ -443,16 +445,14 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       stage.appendChild(h("h1", null, "Hører det til en kampagne?"));
       stage.appendChild(h("p", "sub", "Samme kampagne i alle kanaler, så den kan ses samlet."));
       var l4 = h("div", "list");
-      CAMPAIGNS.forEach(function (c) { l4.appendChild(opt(c, s.campaign === c.v, function () { s.campaign = c.v; next(); })); });
+      CAMPAIGNS.forEach(function (c) {
+        var g = !!c.gift;
+        l4.appendChild(opt(c, s.campaign === c.v && g === isGift(), function () {
+          if (g !== isGift()) { s.url = ""; s.gift = null; }
+          s.campaign = c.v; s.target = g ? "gift" : "page"; next();
+        }));
+      });
       stage.appendChild(l4);
-    }
-
-    if (st === "target") {
-      stage.appendChild(h("h1", null, "Hvad skal linket pege på?"));
-      var lt = h("div", "list");
-      lt.appendChild(opt({ t: "En side", d: "Donation, artikel, kampagneside" }, s.target === "page", function () { if (s.target === "gift") s.url = ""; s.target = "page"; next(); }));
-      lt.appendChild(opt({ t: "Gavebevis", d: "Et gavebevis i webshoppen" }, s.target === "gift", function () { if (s.target !== "gift") { s.url = ""; s.gift = null; } s.target = "gift"; next(); }));
-      stage.appendChild(lt);
     }
 
     if (st === "codes" || s.mode === "amounts") {
@@ -509,13 +509,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         stage.appendChild(h("p", "sub", "Skriv kun en kode, hvis købet skal kunne skelnes, fx til jul."));
         var fg = h("div", "form");
         fg.appendChild(numField("codeGift", "Kampagnekode gavebevis", function () { return s.codeGift; }, function (v) { s.codeGift = v; }, 4, "Standard: " + DEFAULT_CODE_GIFT));
-        if (isEmail()) {
-          var fm = h("div", "field"), ml = h("label", null, "Kampagne, valgfrit"); ml.htmlFor = "mailCampaign";
-          var mi = document.createElement("input"); mi.id = "mailCampaign"; mi.type = "text"; mi.placeholder = "Jul"; mi.autocomplete = "off"; mi.value = s.mailCampaign;
-          mi.addEventListener("input", function () { s.mailCampaign = mi.value; });
-          mi.addEventListener("keydown", function (e) { if (e.key === "Enter") next(); });
-          fm.appendChild(ml); fm.appendChild(mi); fg.appendChild(fm);
-        }
         var ng = h("button", "go", "Videre"); ng.type = "button";
         ng.addEventListener("click", next);
         fg.appendChild(ng);
@@ -546,7 +539,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       var err = h("p", "err"); err.hidden = true;
       f1.appendChild(ul); f1.appendChild(u); f1.appendChild(err);
       var f2 = h("div", "field");
-      var mail = isEmail(), tkey = mail ? "mailCampaign" : "topic";
+      var mail = isEmail() && s.campaign === "evergreen", tkey = mail ? "mailCampaign" : "topic";
       var tl = h("label", null, mail ? "Kampagne, valgfrit" : "Emne, valgfrit"); tl.htmlFor = tkey;
       var t = document.createElement("input"); t.id = tkey; t.type = "text"; t.placeholder = mail ? "Gaza" : "Sudan"; t.autocomplete = "off"; t.value = s[tkey];
       f2.appendChild(tl); f2.appendChild(t);
@@ -563,7 +556,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       t.addEventListener("input", function () { s[tkey] = t.value; });
       [u, t].forEach(function (el) { el.addEventListener("keydown", function (e) { if (e.key === "Enter" && !mk.disabled) submit(); }); });
       mk.addEventListener("click", submit);
-      fm2.appendChild(f1); fm2.appendChild(f2); fm2.appendChild(mk);
+      fm2.appendChild(f1); if (mail || !isEmail()) fm2.appendChild(f2); fm2.appendChild(mk);
       stage.appendChild(fm2);
       reset();
       setTimeout(function () { u.focus(); }, 0);

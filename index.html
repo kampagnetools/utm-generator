@@ -31,6 +31,7 @@
   --soft: rgba(255, 255, 255, .48);
   --hair: rgba(255, 255, 255, .14);
   --red: #FF4D4D;
+  
   --desc: rgba(255, 255, 255, .7);
   --hover: rgba(255, 255, 255, .06);
   --ph: rgba(255, 255, 255, .25);
@@ -235,8 +236,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     { v: "kanyler", t: "Sterile kanyler", d: "Print selv", path: "/produkt/sterile-kanyler/" },
     { v: "gift_certificate", t: "Gift certificate", d: "Engelsk", path: "/produkt/gift-certificate-printable-optional-donation-amount-and-text/" }
   ];
-  var GIFTS_READY = true;
-
   var DEFAULT_CODE_ONE = "2822", DEFAULT_CODE_FP = "2824", DEFAULT_CODE_GIFT = "2472";
 
   var s = fresh();
@@ -244,7 +243,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     return { channel: null, paid: null, format: null, other: "", qr: null, campaign: null,
       codeOne: "", codeFp: "", codeGift: "",
       useAmounts: null, amtOne: ["", "", ""], amtRec: ["", "", ""],
-      url: "", topic: "", mailCampaign: "", step: 0, mode: null, flow: "link", gift: null };
+      url: "", topic: "", mailCampaign: "", step: 0, mode: null, target: null, gift: null };
   }
   function digits(x) { return (x || "").replace(/\D/g, ""); }
   function amountList(arr) { return arr.map(digits).filter(function (a) { return a && +a > 0; }).join(","); }
@@ -287,35 +286,25 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   }
   function source() { return isPrint() ? (s.format === "__other" ? clean(s.other) : s.format) : s.channel; }
   function isEmail() { return medium() === "email"; }
-  function isGift() { return s.flow === "gift"; }
+  function isGift() { return s.target === "gift"; }
   function gift() { return GIFTS.filter(function (g) { return g.v === s.gift; })[0]; }
-  function campaign() {
-    if (isGift()) return s.campaign && s.campaign !== "evergreen" ? s.campaign : "gavebevis";
-    return isEmail() ? (clean(s.mailCampaign) || null) : s.campaign;
-  }
+  function campaign() { return isEmail() ? (clean(s.mailCampaign) || null) : s.campaign; }
   function content() {
-    if (isGift()) { var gb = isEmail() ? null : isPrint() ? s.qr : s.format; return gb ? gb + "_" + s.gift : s.gift; }
+    if (isGift()) { var gb = isEmail() ? null : isPrint() ? s.qr : s.format; return gb ? gb + "_gavebevis" : "gavebevis"; }
     if (isEmail()) return null;
     var t = clean(s.topic), base = isPrint() ? s.qr : s.format;
     return base ? (t ? base + "_" + t : base) : null;
   }
 
   function steps() {
-    if (isGift()) {
-      var g = ["gift", "channel"];
-      if (!s.channel || isSocial() || isPrint()) g.push("paid");
-      if (!isEmail()) g.push("format");
-      if (isPrint()) g.push("qr");
-      g.push("campaign", "codes", "done");
-      return g;
-    }
     var l = ["channel"];
     if (!s.channel || isSocial() || isPrint()) l.push("paid");
     if (!isEmail()) l.push("format");
     if (isPrint()) l.push("qr");
     if (!isEmail()) l.push("campaign");
-    l.push("codes");
-    l.push("url", "done");
+    l.push("target");
+    if (isGift()) l.push("gift", "codes", "done");
+    else l.push("codes", "url", "done");
     return l;
   }
   function cur() { return steps()[s.step]; }
@@ -348,6 +337,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   }
   function label(key) {
     if (key === "gift") return gift().t;
+    if (key === "target") return isGift() ? "Gavebevis" : "Side";
     if (key === "channel") return ch().t;
     if (key === "paid") return isPrint() ? (s.paid ? "Købt plads" : "Egen tryksag") : (s.paid ? "Annonce" : "Organisk");
     if (key === "format") {
@@ -361,7 +351,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       return a.length ? "Beløb " + a.join(" · ") : "Standardbeløb";
     }
     if (key === "codes") {
-      if (isGift()) return "Kode " + (digits(s.codeGift) || DEFAULT_CODE_GIFT);
+      if (isGift()) return digits(s.codeGift) ? "Kode " + digits(s.codeGift) : "Standardkode";
       var ec = extras(), k = [ec.campaign_code, ec.campaign_code_recurring].filter(Boolean);
       return k.length ? "Koder " + k.join("/") : "Ingen koder";
     }
@@ -403,14 +393,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       CHANNELS.forEach(function (c) {
         l.appendChild(opt(c, s.channel === c.v, function () { if (s.channel !== c.v) { s.channel = c.v; s.paid = null; s.format = null; } next(); }));
       });
-      if (!isGift()) {
-        var gr = opt({ t: "Gavebeviser", d: GIFTS_READY ? "Link til et gavebevis" : "Tilgår snarest" }, false, function () {
-          if (!GIFTS_READY) return;
-          s = fresh(); s.flow = "gift"; draw(true);
-        }, GIFTS_READY ? "" : "off");
-        gr.disabled = !GIFTS_READY;
-        l.appendChild(gr);
-      }
       stage.appendChild(l);
     }
 
@@ -465,6 +447,14 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       stage.appendChild(l4);
     }
 
+    if (st === "target") {
+      stage.appendChild(h("h1", null, "Hvad skal linket pege på?"));
+      var lt = h("div", "list");
+      lt.appendChild(opt({ t: "En side", d: "Donation, artikel, kampagneside" }, s.target === "page", function () { if (s.target === "gift") s.url = ""; s.target = "page"; next(); }));
+      lt.appendChild(opt({ t: "Gavebevis", d: "Et gavebevis i webshoppen" }, s.target === "gift", function () { if (s.target !== "gift") { s.url = ""; s.gift = null; } s.target = "gift"; next(); }));
+      stage.appendChild(lt);
+    }
+
     if (st === "codes" || s.mode === "amounts") {
       function numField(id, text, get, set, max, ph) {
         var fd = h("div", "field");
@@ -516,9 +506,16 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
 
       if (st === "codes" && !s.mode && isGift()) {
         stage.appendChild(h("h1", null, "Kampagnekode"));
-        stage.appendChild(h("p", "sub", "Kun hvis købet skal skelnes, fx til jul. Tomt felt giver " + DEFAULT_CODE_GIFT + "."));
+        stage.appendChild(h("p", "sub", "Skriv kun en kode, hvis købet skal kunne skelnes, fx til jul."));
         var fg = h("div", "form");
-        fg.appendChild(numField("codeGift", "Kampagnekode gavebevis", function () { return s.codeGift; }, function (v) { s.codeGift = v; }, 4, "Hvis ingen valgt: " + DEFAULT_CODE_GIFT));
+        fg.appendChild(numField("codeGift", "Kampagnekode gavebevis", function () { return s.codeGift; }, function (v) { s.codeGift = v; }, 4, "Standard: " + DEFAULT_CODE_GIFT));
+        if (isEmail()) {
+          var fm = h("div", "field"), ml = h("label", null, "Kampagne, valgfrit"); ml.htmlFor = "mailCampaign";
+          var mi = document.createElement("input"); mi.id = "mailCampaign"; mi.type = "text"; mi.placeholder = "Jul"; mi.autocomplete = "off"; mi.value = s.mailCampaign;
+          mi.addEventListener("input", function () { s.mailCampaign = mi.value; });
+          mi.addEventListener("keydown", function (e) { if (e.key === "Enter") next(); });
+          fm.appendChild(ml); fm.appendChild(mi); fg.appendChild(fm);
+        }
         var ng = h("button", "go", "Videre"); ng.type = "button";
         ng.addEventListener("click", next);
         fg.appendChild(ng);
@@ -608,9 +605,9 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       var same = h("button", "small", "Samme kampagne, ny kanal"); same.type = "button";
       same.addEventListener("click", function () { var keep = { campaign: s.campaign, codeOne: s.codeOne, codeFp: s.codeFp, codeGift: s.codeGift,
         useAmounts: s.useAmounts, amtOne: s.amtOne.slice(), amtRec: s.amtRec.slice(), url: s.url, topic: s.topic, mailCampaign: s.mailCampaign,
-        flow: s.flow, gift: s.gift, step: isGift() ? 1 : 0 }; s = fresh(); Object.assign(s, keep); draw(true); });
+        target: s.target, gift: s.gift }; s = fresh(); Object.assign(s, keep); draw(true); });
       var nw = h("button", "small", "Start forfra"); nw.type = "button";
-      nw.addEventListener("click", function () { var fl = s.flow; s = fresh(); s.flow = fl; draw(true); });
+      nw.addEventListener("click", function () { s = fresh(); draw(true); });
       acts.appendChild(cp); acts.appendChild(ok); acts.appendChild(same); acts.appendChild(nw);
       stage.appendChild(acts);
 
@@ -642,11 +639,10 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       stage.appendChild(cols);
     }
 
-    if (s.step > 0 || isGift()) {
+    if (s.step > 0) {
       var back = h("button", "back", "Tilbage"); back.type = "button";
       back.addEventListener("click", function () {
         if (s.mode) { s.mode = null; draw(true); }
-        else if (s.step === 0) { s = fresh(); draw(true); }
         else go(s.step - 1);
       });
       stage.appendChild(back);

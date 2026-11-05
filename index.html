@@ -159,7 +159,8 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     { v: "facebook", t: "Facebook", d: "Opslag, story, annonce", social: true },
     { v: "instagram", t: "Instagram", d: "Opslag, story, reel, bio", social: true },
     { v: "linkedin", t: "LinkedIn", d: "Opslag, annonce", social: true },
-    { v: "gads", t: "Google og Microsoft Ads", d: "Søg, Display, YouTube, PMax", gads: true },
+    { v: "google-ads", t: "Google Ads", d: "Søg, Display, YouTube, PMax", gads: true },
+    { v: "microsoft-ads", t: "Microsoft Ads", d: "Bing, Microsoft-netværket", gads: true, ms: true },
     { v: "display", t: "Display og andet købt", d: "Bannere, video, podcast, native", display: true },
     { v: "sfmc", t: "Nyhedsbrev", d: "Mail fra SFMC", medium: "email" },
     { v: "print", t: "Print og outdoor", d: "Brev, Journalen, outdoor, avisannonce", print: true },
@@ -273,6 +274,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function isPrint() { var c = ch(); return !!(c && c.print); }
   function isGads() { var c = ch(); return !!(c && c.gads); }
   function isDisplay() { var c = ch(); return !!(c && c.display); }
+  function isMs() { var c = ch(); return !!(c && c.ms); }
   function medium() {
     var c = ch(); if (!c) return null;
     if (c.social) return s.paid ? "paid-social" : "organic";
@@ -623,14 +625,22 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       setTimeout(function () { u.focus(); }, 0);
     }
 
-    // Google og Microsoft Ads: ingen UTM-koder (auto-tagging klarer det), kun et suffiks med kampagnekoder
+    // Google Ads: ingen UTM-koder (gclid klarer det), kun kampagnekoder.
+    // Microsoft Ads: UTM-koder + kampagnekoder, så utm_campaign er den samme som i de andre kanaler.
     if (st === "done" && !s.mode && isGads()) {
-      var gcodes = extras();
-      var suffix = Object.keys(gcodes).map(function (k) { return k + "=" + gcodes[k]; }).join("&");
+      var gcodes = extras(), gparts = [];
+      if (isMs()) {
+        gparts.push("utm_source=bing", "utm_medium=cpc", "utm_campaign=" + campaign(),
+          "utm_content=" + (isGift() ? "gavebevis" : "{AdGroup}"), "utm_term={keyword}");
+      }
+      Object.keys(gcodes).forEach(function (k) { gparts.push(k + "=" + gcodes[k]); });
+      var suffix = gparts.join("&");
 
       if (suffix) {
         stage.appendChild(h("h1", null, "Dit suffiks er klar."));
-        stage.appendChild(h("p", "sub", "Ingen UTM-koder. Google og Microsoft sætter selv kilde og kampagne på via auto-tagging."));
+        stage.appendChild(h("p", "sub", isMs()
+          ? "Microsoft fylder selv annoncegruppe og søgeord ind i {AdGroup} og {keyword}."
+          : "Ingen UTM-koder. Google Ads giver GA4 kilde og kampagne via auto-tagging."));
         var sline = codeLine(suffix, 0);
         stage.appendChild(sline);
         stage.appendChild(doneActions(suffix, sline));
@@ -643,12 +653,20 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       if (amountsAllowed()) stage.appendChild(amountsOption());
 
       var gc = h("div", "cols");
-      var g1 = h("div"); g1.appendChild(h("h2", null, "Google Ads"));
-      g1.appendChild(h("p", "sub", "Kampagne > Indstillinger > Indstillinger for kampagnewebadresse > Endelig webadresse-suffiks. Virker for Søg, Display, YouTube, Demand Gen og PMax. Auto-tagging skal være slået til."));
-      gc.appendChild(g1);
-      var g2 = h("div"); g2.appendChild(h("h2", null, "Microsoft Ads"));
-      g2.appendChild(h("p", "sub", "Samme suffiks på kampagnen. Slå automatisk UTM-tagging til under kontoindstillinger."));
-      gc.appendChild(g2);
+      var g1 = h("div");
+      if (isMs()) {
+        g1.appendChild(h("h2", null, "Sådan i Microsoft Ads"));
+        g1.appendChild(h("p", "sub", "Sæt suffikset på kampagnen under Kampagnewebadresse > Endelig webadresse-suffiks."));
+        var g2 = h("div"); g2.appendChild(h("h2", null, "Tjek kontoindstillinger > Auto-tagging"));
+        g2.appendChild(h("p", "sub", "Microsoft Click ID (msclkid): slået til. UTM-tags: Erstat ikke eksisterende UTM-tags."));
+        gc.appendChild(g1); gc.appendChild(g2);
+      } else {
+        g1.appendChild(h("h2", null, "Sådan i Google Ads"));
+        g1.appendChild(h("p", "sub", "Kampagne > Indstillinger > Indstillinger for kampagnewebadresse > Endelig webadresse-suffiks. Virker for Søg, Display, YouTube, Demand Gen og PMax."));
+        var g3 = h("div"); g3.appendChild(h("h2", null, "Tjek"));
+        g3.appendChild(h("p", "sub", "Automatisk tagging er slået til. Der står ingen utm_-koder i suffikser eller sporingsskabeloner."));
+        gc.appendChild(g1); gc.appendChild(g3);
+      }
       stage.appendChild(gc);
     }
 
@@ -684,7 +702,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       }
       if (isDisplay()) {
         var c4 = h("div"); c4.appendChild(h("h2", null, "Bruges i Google Ads?"));
-        c4.appendChild(h("p", "sub", "Så skal du ikke bruge dette link. Vælg Google og Microsoft Ads i stedet."));
+        c4.appendChild(h("p", "sub", "Så skal du ikke bruge dette link. Vælg Google Ads eller Microsoft Ads i stedet."));
         cols.appendChild(c4);
       }
       if (isPrint() && s.qr === "link") {

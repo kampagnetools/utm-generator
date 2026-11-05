@@ -31,7 +31,7 @@
   --soft: rgba(255, 255, 255, .48);
   --hair: rgba(255, 255, 255, .14);
   --red: #FF4D4D;
-  
+
   --desc: rgba(255, 255, 255, .7);
   --hover: rgba(255, 255, 255, .06);
   --ph: rgba(255, 255, 255, .25);
@@ -159,6 +159,8 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     { v: "facebook", t: "Facebook", d: "Opslag, story, annonce", social: true },
     { v: "instagram", t: "Instagram", d: "Opslag, story, reel, bio", social: true },
     { v: "linkedin", t: "LinkedIn", d: "Opslag, annonce", social: true },
+    { v: "gads", t: "Google og Microsoft Ads", d: "Søg, Display, YouTube, PMax", gads: true },
+    { v: "display", t: "Display og andet købt", d: "Bannere, video, podcast, native", display: true },
     { v: "sfmc", t: "Nyhedsbrev", d: "Mail fra SFMC", medium: "email" },
     { v: "print", t: "Print og outdoor", d: "Brev, Journalen, outdoor, avisannonce", print: true },
     { v: "msf-web", t: "MSF.DK", d: "Banner, popup", medium: "internal" }
@@ -204,6 +206,13 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       { v: "leadcard", t: "Lead-annonce", d: "Formular i LinkedIn", o: "Kan være billede eller video. Vælg Lead-annonce." },
       { v: "message", t: "Besked", d: "Sendes i indbakken" }
     ],
+    // Display købt uden om Google Ads. m = utm_medium, så GA4 lægger det i den rigtige kanal.
+    display: [
+      { v: "banner", t: "Banner", d: "Billede eller animation", m: "display" },
+      { v: "video", t: "Video", d: "Pre-roll, online-tv", m: "display" },
+      { v: "audio", t: "Podcast og lyd", d: "Spot i podcast eller netradio", m: "audio" },
+      { v: "native", t: "Native", d: "Advertorial, betalt artikel", m: "paid-native" }
+    ],
     printOwn: [
       { v: "journalen", t: "Journalen", d: "Medlemsbladet" },
       { v: "brev", t: "Brev", d: "Høstbrev, julebrev, andre breve" },
@@ -230,7 +239,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
 
   var s = fresh();
   function fresh() {
-    return { channel: null, paid: null, format: null, other: "", qr: null, campaign: null,
+    return { channel: null, paid: null, format: null, other: "", sourceName: "", qr: null, campaign: null,
       codeOne: "", codeFp: "", codeGift: "",
       useAmounts: null, amtOne: ["", "", ""], amtRec: ["", "", ""],
       url: "", topic: "", mailCampaign: "", step: 0, mode: null, target: null };
@@ -250,7 +259,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     return e;
   }
   function isAd() { return isSocial() && s.paid === true; }
-  function amountsAllowed() { return !isGift() && (isAd() || medium() === "email"); }
+  function amountsAllowed() { return !isGift() && (isAd() || isGads() || isDisplay() || medium() === "email"); }
   var $ = function (id) { return document.getElementById(id); };
 
   function clean(x) {
@@ -262,19 +271,27 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function ch() { return CHANNELS.filter(function (c) { return c.v === s.channel; })[0]; }
   function isSocial() { var c = ch(); return !!(c && c.social); }
   function isPrint() { var c = ch(); return !!(c && c.print); }
+  function isGads() { var c = ch(); return !!(c && c.gads); }
+  function isDisplay() { var c = ch(); return !!(c && c.display); }
   function medium() {
     var c = ch(); if (!c) return null;
     if (c.social) return s.paid ? "paid-social" : "organic";
     if (c.print) return s.paid ? "print-paid" : "print";
+    if (c.display) { var f = FORMATS.display.filter(function (x) { return x.v === s.format; })[0]; return f ? f.m : "display"; }
+    if (c.gads) return null;
     return c.medium;
   }
   function formats() {
     var c = ch(); if (!c) return [];
     if (c.social) return s.paid ? (c.v === "linkedin" ? FORMATS.linkedin_paid : FORMATS.meta_paid) : FORMATS[c.v];
     if (c.print) return s.paid ? FORMATS.printPaid : FORMATS.printOwn;
-    return FORMATS[c.medium];
+    if (c.display) return FORMATS.display;
+    return FORMATS[c.medium] || [];
   }
-  function source() { return isPrint() ? (s.format === "__other" ? clean(s.other) : s.format) : s.channel; }
+  function source() {
+    if (isDisplay()) return clean(s.sourceName);
+    return isPrint() ? (s.format === "__other" ? clean(s.other) : s.format) : s.channel;
+  }
   function isEmail() { return medium() === "email"; }
   function isGift() { return s.target === "gift"; }
   function campaign() {
@@ -291,10 +308,12 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
   function steps() {
     var l = ["channel"];
     if (!s.channel || isSocial() || isPrint()) l.push("paid");
-    if (!isEmail()) l.push("format");
+    if (!isEmail() && !isGads()) l.push("format");
+    if (isDisplay()) l.push("source");
     if (isPrint()) l.push("qr");
     l.push("campaign");
-    if (isGift()) l.push("codes", "done");
+    // Google og Microsoft Ads: ingen landingsside, kun et suffiks med koder
+    if (isGift() || isGads()) l.push("codes", "done");
     else l.push("codes", "url", "done");
     return l;
   }
@@ -333,6 +352,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       if (s.format === "__other") return clean(s.other);
       var f = formats().filter(function (x) { return x.v === s.format; })[0]; return f ? f.t : "";
     }
+    if (key === "source") return clean(s.sourceName);
     if (key === "qr") return s.qr === "qr" ? "QR-kode" : "Trykt link";
     if (key === "campaign") return s.campaign === "evergreen" ? "Ingen kampagne" : (isGift() ? "Gavebevis " : "") + campaign();
     if (key === "amounts") {
@@ -345,6 +365,52 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       return k.length ? "Koder " + k.join("/") : "Ingen koder";
     }
     return "";
+  }
+
+  // Viser en adresse eller et suffiks med nøglerne nedtonet
+  function codeLine(text, start) {
+    var link = h("p", "linkout");
+    link.appendChild(document.createTextNode(text.slice(0, start)));
+    text.slice(start).split("&").forEach(function (pair, i) {
+      if (i) link.appendChild(h("span", "k", "&"));
+      var eq = pair.indexOf("=");
+      link.appendChild(h("span", "k", pair.slice(0, eq + 1)));
+      link.appendChild(document.createTextNode(pair.slice(eq + 1)));
+    });
+    return link;
+  }
+
+  // Kopiér, Samme kampagne ny kanal, Start forfra
+  function doneActions(text, link) {
+    var acts = h("div", "actions");
+    if (text) {
+      var cp = h("button", "go", "Kopiér"); cp.type = "button";
+      var ok = h("span", "ok", "");
+      cp.addEventListener("click", function () {
+        var fallback = function () {
+          var r = document.createRange(); r.selectNodeContents(link);
+          var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+          ok.textContent = "Markeret. Tryk Ctrl+C.";
+        };
+        try { navigator.clipboard.writeText(text).then(function () { ok.textContent = "Kopieret"; }, fallback); } catch (e) { fallback(); }
+      });
+      acts.appendChild(cp); acts.appendChild(ok);
+    }
+    var same = h("button", "small", "Samme kampagne, ny kanal"); same.type = "button";
+    same.addEventListener("click", function () { var keep = { campaign: s.campaign, codeOne: s.codeOne, codeFp: s.codeFp, codeGift: s.codeGift,
+      useAmounts: s.useAmounts, amtOne: s.amtOne.slice(), amtRec: s.amtRec.slice(), url: s.url, topic: s.topic, mailCampaign: s.mailCampaign,
+      target: s.target }; s = fresh(); Object.assign(s, keep); draw(true); });
+    var nw = h("button", "small", "Start forfra"); nw.type = "button";
+    nw.addEventListener("click", function () { s = fresh(); draw(true); });
+    acts.appendChild(same); acts.appendChild(nw);
+    return acts;
+  }
+
+  function amountsOption() {
+    var more = h("div", "list");
+    more.appendChild(opt({ t: s.useAmounts ? "Ret beløbsforslag →" : "Tilføj beløbsforslag →",
+      d: s.useAmounts ? label("amounts") : "Egne beløb i donationsformularen" }, false, openAmounts, "more"));
+    return more;
   }
 
   function draw(animate) {
@@ -386,7 +452,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     }
 
     if (st === "format") {
-      var head = isPrint() ? (s.paid ? "Hvilket medie?" : "Hvilken tryksag?") : "Hvad slags " + (isSocial() ? (s.paid ? "annonce" : "opslag") : "indhold") + "?";
+      var head = isDisplay() ? "Hvilken type annonce?" : isPrint() ? (s.paid ? "Hvilket medie?" : "Hvilken tryksag?") : "Hvad slags " + (isSocial() ? (s.paid ? "annonce" : "opslag") : "indhold") + "?";
       stage.appendChild(h("h1", null, head));
       var l3 = h("div", "list");
       formats().forEach(function (f) {
@@ -409,6 +475,23 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         fo.appendChild(ff); fo.appendChild(ob);
         stage.appendChild(fo); updO();
       }
+    }
+
+    if (st === "source") {
+      stage.appendChild(h("h1", null, "Hvor kører annoncen?"));
+      stage.appendChild(h("p", "sub", "Netværk eller medie, f.eks. adform, dv360, politiken eller podimo. Skriv det samme hver gang."));
+      var fs = h("div", "form"), fsf = h("div", "field");
+      var sl = h("label", null, "Netværk eller medie"); sl.htmlFor = "src";
+      var sin = document.createElement("input"); sin.id = "src"; sin.type = "text"; sin.placeholder = "adform"; sin.autocomplete = "off"; sin.value = s.sourceName;
+      var sb = h("button", "go", "Videre"); sb.type = "button";
+      function updS() { sb.disabled = !clean(sin.value); }
+      sin.addEventListener("input", function () { s.sourceName = sin.value; updS(); });
+      sin.addEventListener("keydown", function (e) { if (e.key === "Enter" && clean(sin.value)) next(); });
+      sb.addEventListener("click", next);
+      fsf.appendChild(sl); fsf.appendChild(sin);
+      fs.appendChild(fsf); fs.appendChild(sb);
+      stage.appendChild(fs); updS();
+      setTimeout(function () { sin.focus(); }, 0);
     }
 
     if (st === "qr") {
@@ -470,7 +553,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         fa.appendChild(amountRow("One-off", "amtOne", "amtOne", ["150", "300", "500"]));
         fa.appendChild(amountRow("Fast, pr. måned", "amtRec", "amtRec", ["100", "150", "200"]));
         var acts2 = h("div", "actions");
-        var up = h("button", "go", "Opdater link"); up.type = "button";
+        var up = h("button", "go", isGads() ? "Opdater suffiks" : "Opdater link"); up.type = "button";
         up.addEventListener("click", closeAmounts);
         acts2.appendChild(up);
         if (s.useAmounts) {
@@ -540,7 +623,36 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       setTimeout(function () { u.focus(); }, 0);
     }
 
-    if (st === "done" && !s.mode) {
+    // Google og Microsoft Ads: ingen UTM-koder (auto-tagging klarer det), kun et suffiks med kampagnekoder
+    if (st === "done" && !s.mode && isGads()) {
+      var gcodes = extras();
+      var suffix = Object.keys(gcodes).map(function (k) { return k + "=" + gcodes[k]; }).join("&");
+
+      if (suffix) {
+        stage.appendChild(h("h1", null, "Dit suffiks er klar."));
+        stage.appendChild(h("p", "sub", "Ingen UTM-koder. Google og Microsoft sætter selv kilde og kampagne på via auto-tagging."));
+        var sline = codeLine(suffix, 0);
+        stage.appendChild(sline);
+        stage.appendChild(doneActions(suffix, sline));
+      } else {
+        stage.appendChild(h("h1", null, "Der skal ikke sættes noget på."));
+        stage.appendChild(h("p", "sub", "Uden kampagnekoder klarer auto-tagging det hele. Sæt ingen UTM-koder på annoncerne."));
+        stage.appendChild(doneActions("", null));
+      }
+
+      if (amountsAllowed()) stage.appendChild(amountsOption());
+
+      var gc = h("div", "cols");
+      var g1 = h("div"); g1.appendChild(h("h2", null, "Google Ads"));
+      g1.appendChild(h("p", "sub", "Kampagne > Indstillinger > Indstillinger for kampagnewebadresse > Endelig webadresse-suffiks. Virker for Søg, Display, YouTube, Demand Gen og PMax. Auto-tagging skal være slået til."));
+      gc.appendChild(g1);
+      var g2 = h("div"); g2.appendChild(h("h2", null, "Microsoft Ads"));
+      g2.appendChild(h("p", "sub", "Samme suffiks på kampagnen. Slå automatisk UTM-tagging til under kontoindstillinger."));
+      gc.appendChild(g2);
+      stage.appendChild(gc);
+    }
+
+    if (st === "done" && !s.mode && !isGads()) {
       var p = parseUrl(s.url).url;
       var vals = { utm_source: source(), utm_medium: medium(), utm_campaign: campaign(), utm_content: content() };
       Object.keys(vals).forEach(function (k) { if (!vals[k]) delete vals[k]; });
@@ -551,43 +663,11 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       var href = p.toString().replace(/%2C/gi, ",");
 
       stage.appendChild(h("h1", null, "Dit link er klar."));
-      var link = h("p", "linkout");
-      var q = href.indexOf("?");
-      link.appendChild(document.createTextNode(href.slice(0, q + 1)));
-      href.slice(q + 1).split("&").forEach(function (pair, i) {
-        if (i) link.appendChild(h("span", "k", "&"));
-        var eq = pair.indexOf("=");
-        link.appendChild(h("span", "k", pair.slice(0, eq + 1)));
-        link.appendChild(document.createTextNode(pair.slice(eq + 1)));
-      });
+      var link = codeLine(href, href.indexOf("?") + 1);
       stage.appendChild(link);
+      stage.appendChild(doneActions(href, link));
 
-      var acts = h("div", "actions");
-      var cp = h("button", "go", "Kopiér"); cp.type = "button";
-      var ok = h("span", "ok", "");
-      cp.addEventListener("click", function () {
-        var fallback = function () {
-          var r = document.createRange(); r.selectNodeContents(link);
-          var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
-          ok.textContent = "Markeret. Tryk Ctrl+C.";
-        };
-        try { navigator.clipboard.writeText(href).then(function () { ok.textContent = "Kopieret"; }, fallback); } catch (e) { fallback(); }
-      });
-      var same = h("button", "small", "Samme kampagne, ny kanal"); same.type = "button";
-      same.addEventListener("click", function () { var keep = { campaign: s.campaign, codeOne: s.codeOne, codeFp: s.codeFp, codeGift: s.codeGift,
-        useAmounts: s.useAmounts, amtOne: s.amtOne.slice(), amtRec: s.amtRec.slice(), url: s.url, topic: s.topic, mailCampaign: s.mailCampaign,
-        target: s.target }; s = fresh(); Object.assign(s, keep); draw(true); });
-      var nw = h("button", "small", "Start forfra"); nw.type = "button";
-      nw.addEventListener("click", function () { s = fresh(); draw(true); });
-      acts.appendChild(cp); acts.appendChild(ok); acts.appendChild(same); acts.appendChild(nw);
-      stage.appendChild(acts);
-
-      if (amountsAllowed()) {
-        var more = h("div", "list");
-        more.appendChild(opt({ t: s.useAmounts ? "Ret beløbsforslag →" : "Tilføj beløbsforslag →",
-          d: s.useAmounts ? label("amounts") : "Egne beløb i donationsformularen" }, false, openAmounts, "more"));
-        stage.appendChild(more);
-      }
+      if (amountsAllowed()) stage.appendChild(amountsOption());
 
       var cols = h("div", "cols");
       var c1 = h("div"); c1.appendChild(h("h2", null, "Koderne"));
@@ -601,6 +681,11 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         Object.keys(codes).forEach(function (k) { adsParams += "&" + k + "=" + codes[k]; });
         c2.appendChild(h("p", "adscode", adsParams));
         cols.appendChild(c2);
+      }
+      if (isDisplay()) {
+        var c4 = h("div"); c4.appendChild(h("h2", null, "Bruges i Google Ads?"));
+        c4.appendChild(h("p", "sub", "Så skal du ikke bruge dette link. Vælg Google og Microsoft Ads i stedet."));
+        cols.appendChild(c4);
       }
       if (isPrint() && s.qr === "link") {
         var c3 = h("div"); c3.appendChild(h("h2", null, "Trykt link? Lav en kort adresse"));

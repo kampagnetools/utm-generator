@@ -7,10 +7,10 @@ var CHANNELS = [
   { v: "facebook", t: "Facebook", d: "Opslag, story, annonce", social: true },
   { v: "instagram", t: "Instagram", d: "Opslag, story, reel, bio", social: true },
   { v: "linkedin", t: "LinkedIn", d: "Opslag, annonce", social: true },
-  { v: "google-ads", t: "Google Ads", d: "Søg, Display, YouTube, PMax", gads: true },
+  { v: "google-ads", t: "Google Ads", d: "Søg, Display, YouTube", gads: true },
   { v: "microsoft-ads", t: "Microsoft Ads", d: "Bing, Microsoft-netværket", gads: true, ms: true },
   { v: "display", t: "Display og andet købt", d: "Bannere, video, podcast, native", display: true },
-  { v: "sfmc", t: "Nyhedsbrev", d: "Mail fra SFMC", medium: "email" },
+  { v: "sfmc", t: "Marketing Cloud", d: "Mail fra SFMC", medium: "email" },
   { v: "print", t: "Print og outdoor", d: "Brev, Journalen, outdoor, avisannonce", print: true },
   { v: "msf-web", t: "MSF.DK", d: "Banner, popup", medium: "internal" }
 ];

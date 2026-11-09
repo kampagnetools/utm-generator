@@ -18,7 +18,8 @@
     var fp = digits(s.codeFp) || (isEmail() ? DEFAULT_CODE_FP : "");
     if (one) e.campaign_code = one;
     if (fp) e.campaign_code_recurring = fp;
-    if (digits(s.codeGift)) e.utm_campaign_code = digits(s.codeGift);
+    var gift = digits(s.codeGift) || (isEmail() ? DEFAULT_CODE_GIFT : "");
+    if (gift) e.utm_campaign_code = gift;
     return e;
   }
   function isAd() { return isSocial() && s.paid === true; }
@@ -273,13 +274,13 @@
     }
 
     if (st === "codes" || s.mode === "amounts") {
-      function numField(id, text, get, set, max, ph) {
+      function numField(id, text, get, set, max, ph, onEnter) {
         var fd = h("div", "field");
         var lbl = h("label", null, text); lbl.htmlFor = id;
         var ci = document.createElement("input"); ci.id = id; ci.type = "text"; ci.inputMode = "numeric"; ci.autocomplete = "off";
         ci.placeholder = ph; ci.maxLength = max; ci.value = get();
         ci.addEventListener("input", function () { var d = digits(ci.value).slice(0, max); if (d !== ci.value) ci.value = d; set(d); });
-        ci.addEventListener("keydown", function (e) { if (e.key === "Enter") next(); });
+        ci.addEventListener("keydown", function (e) { if (e.key === "Enter") (onEnter || next)(); });
         fd.appendChild(lbl); fd.appendChild(ci);
         return fd;
       }
@@ -323,14 +324,42 @@
 
       if (st === "codes" && !s.mode) {
         stage.appendChild(h("h1", null, "Kampagnekoder"));
-        stage.appendChild(h("p", "sub", "Udfyld dem, der skal med. Tomme felter kommer ikke med i linket."));
+        stage.appendChild(h("p", "sub", isEmail() ? "Udfyld dem, der skal med. Tomme felter får standardkoden." : "Udfyld dem, der skal med. Tomme felter kommer ikke med i linket."));
         var fk = h("div", "form");
-        fk.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; }, 4, isEmail() ? "Hvis ingen valgt: " + DEFAULT_CODE_ONE : "Indtast kampagnekode"));
-        fk.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; }, 4, isEmail() ? "Hvis ingen valgt: " + DEFAULT_CODE_FP : "Indtast kampagnekode"));
-        fk.appendChild(numField("codeGift", "Kampagnekode gavebevis", function () { return s.codeGift; }, function (v) { s.codeGift = v; }, 4, "Hvis ingen valgt: " + DEFAULT_CODE_GIFT));
+        var warn = h("p", "err"); warn.hidden = true;
         var nk = h("button", "go", "Videre"); nk.type = "button";
-        nk.addEventListener("click", next);
-        fk.appendChild(nk);
+        var nb = h("button", "small", "Tilbage til koderne"); nb.type = "button"; nb.hidden = true;
+        var warned = false;
+        function resetWarn() { warned = false; warn.hidden = true; nb.hidden = true; nk.textContent = "Videre"; }
+        // Spørg én gang, før vi går videre:
+        // Marketing Cloud: One-off eller Feltpartner er tom, så standardkoden bruges.
+        // Andre kanaler: ingen koder overhovedet.
+        function submitCodes() {
+          var msg = "";
+          if (isEmail()) {
+            var d = [];
+            if (!digits(s.codeOne)) d.push("One-off " + DEFAULT_CODE_ONE);
+            if (!digits(s.codeFp)) d.push("Feltpartner " + DEFAULT_CODE_FP);
+            if (d.length) msg = "Intet er valgt" + (d.length === 1 ? " for " + d[0].split(" ")[0] : "") + (d.length === 1 ? ". Standardkampagnekoden er valgt: " : ". Standardkampagnekoderne er valgt: ") + d.join(" og ") + ". Er du sikker på, at det er rigtigt?";
+          } else if (!digits(s.codeOne) && !digits(s.codeFp) && !digits(s.codeGift)) {
+            msg = "Du har hverken valgt kampagnekode One-off, Feltpartner eller gavebevis. Er du sikker på, at det er rigtigt?";
+          }
+          if (msg && !warned) {
+            warned = true; warn.hidden = false; nb.hidden = false; nk.textContent = "Ja, videre";
+            warn.textContent = msg;
+            return;
+          }
+          next();
+        }
+        fk.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; resetWarn(); }, 4, isEmail() ? "Hvis ingen valgt: " + DEFAULT_CODE_ONE : "Indtast kampagnekode", submitCodes));
+        fk.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; resetWarn(); }, 4, isEmail() ? "Hvis ingen valgt: " + DEFAULT_CODE_FP : "Indtast kampagnekode", submitCodes));
+        fk.appendChild(numField("codeGift", "Kampagnekode gavebevis", function () { return s.codeGift; }, function (v) { s.codeGift = v; resetWarn(); }, 4, isEmail() ? "Hvis ingen valgt: " + DEFAULT_CODE_GIFT : "Hvis ingen valgt, kommer den ikke med", submitCodes));
+        fk.appendChild(warn);
+        var ka = h("div", "actions");
+        nk.addEventListener("click", submitCodes);
+        nb.addEventListener("click", function () { resetWarn(); $("codeOne").focus(); });
+        ka.appendChild(nk); ka.appendChild(nb);
+        fk.appendChild(ka);
         stage.appendChild(fk);
         setTimeout(function () { var i = $("codeOne"); if (i) i.focus(); }, 0);
       }

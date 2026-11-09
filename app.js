@@ -32,6 +32,8 @@
     else if (isPrint() && s.paid && s.format && s.format !== "__other") key = s.format + (s.insert ? "_indstik" : "_print");
     return (key && list[key]) || "";
   }
+  // Medier uden indstik (noInsert i config.js) springer "Annonce eller indstik?" over og tæller som annonce
+  function noInsert() { var f = formats().filter(function (x) { return x.v === s.format; })[0]; return !!(f && f.noInsert); }
   function isAd() { return isSocial() && s.paid === true; }
   function amountsAllowed() { return isAd() || isGads() || isDisplay() || medium() === "email"; }
   var $ = function (id) { return document.getElementById(id); };
@@ -74,8 +76,8 @@
     return isEmail() ? (clean(s.mailCampaign) || null) : s.campaign;
   }
   function content() {
-    if (isEmail()) return null;
-    var t = clean(s.topic), base = isPrint() ? (s.paid ? (s.insert ? "indstik_" : "annonce_") + s.qr : s.qr) : s.format;
+    if (isEmail() || isPrint()) return null; // utm_content kun for digitale medier
+    var t = clean(s.topic), base = s.format;
     return base ? (t ? base + "_" + t : base) : null;
   }
 
@@ -84,7 +86,7 @@
     if (!s.channel || isSocial() || isPrint()) l.push("paid");
     if (!isEmail() && !isGads()) l.push("format");
     if (isDisplay()) l.push("source");
-    if (isPrint() && s.paid) l.push("insert");
+    if (isPrint() && s.paid && !noInsert()) l.push("insert");
     if (isPrint()) l.push("qr");
     l.push("campaign");
     // Google, Microsoft og OpenAI Ads: ingen landingsside, kun et suffiks / Tracking parameters med koder
@@ -226,6 +228,7 @@
     }
 
     if (st === "format") {
+      if (noInsert()) s.insert = false;
       var head = isDisplay() ? "Hvilken type annonce?" : isPrint() ? (s.paid ? "Hvilket medie?" : "Hvilken tryksag?") : "Hvad slags " + (isSocial() ? (s.paid ? "annonce" : "opslag") : "indhold") + "?";
       stage.appendChild(h("h1", null, head));
       var l3 = h("div", "list");
@@ -415,7 +418,7 @@
       t.addEventListener("input", function () { s[tkey] = t.value; });
       [u, t].forEach(function (el) { el.addEventListener("keydown", function (e) { if (e.key === "Enter" && !mk.disabled) submit(); }); });
       mk.addEventListener("click", submit);
-      fm2.appendChild(f1); if (mail || !isEmail()) fm2.appendChild(f2); fm2.appendChild(mk);
+      fm2.appendChild(f1); if (mail || (!isEmail() && !isPrint())) fm2.appendChild(f2); fm2.appendChild(mk);
       stage.appendChild(fm2);
       reset();
       setTimeout(function () { u.focus(); }, 0);
@@ -429,9 +432,9 @@
         gparts.push("utm_source=bing", "utm_medium=cpc", "utm_campaign=" + campaign(),
           "utm_content={AdGroup}", "utm_term={keyword}");
       } else if (isOai()) {
-        // OpenAI fylder selv {campaign_id}, {ad_group_id}, {ad_id} og klik-ID'et {oppref} ind
+        // OpenAI fylder selv {campaign_id}, {ad_group_id} og {ad_id} ind. oppref er reserveret: OpenAI sætter det selv på klikket
         gparts.push("utm_source=openai", "utm_medium=cpc", "utm_campaign=" + campaign(),
-          "utm_id={campaign_id}", "utm_content={ad_group_id}_{ad_id}", "oppref={oppref}");
+          "utm_id={campaign_id}", "utm_content={ad_group_id}_{ad_id}");
       }
       Object.keys(gcodes).forEach(function (k) { gparts.push(k + "=" + gcodes[k]); });
       var suffix = gparts.join("&");
@@ -441,7 +444,7 @@
         stage.appendChild(h("p", "sub", isMs()
           ? "Microsoft fylder selv annoncegruppe og søgeord ind i {AdGroup} og {keyword}."
           : isOai()
-          ? "OpenAI fylder selv kampagne, annoncegruppe, annonce og klik-ID ind i felterne i krøllede parenteser."
+          ? "OpenAI fylder selv kampagne, annoncegruppe og annonce ind i felterne i krøllede parenteser. Klik-ID'et oppref sætter OpenAI selv på."
           : "Ingen UTM-koder. Google Ads giver GA4 kilde og kampagne via auto-tagging."));
         var sline = codeLine(suffix, 0);
         stage.appendChild(sline);
@@ -466,7 +469,7 @@
         g1.appendChild(h("h2", null, "Sådan i OpenAI Ads Manager"));
         g1.appendChild(h("p", "sub", "Edit Campaign > Tracking parameters: erstat teksten med ovenstående. Gør feltet tomt på annoncegrupper og annoncer, så de arver fra kampagnen. Link på annoncen er kun landingssiden, f.eks. https://msf.dk/stoet/."));
         var g4 = h("div"); g4.appendChild(h("h2", null, "Andre koder til én annoncegruppe?"));
-        g4.appendChild(h("p", "sub", "Lav en ny tekst her og sæt den på den annoncegruppe. Test bagefter et klik: adressen skal have utm_campaign, kampagnekoden og oppref med en værdi."));
+        g4.appendChild(h("p", "sub", "Lav en ny tekst her og sæt den på den annoncegruppe. Test bagefter et klik: adressen skal have utm_campaign, kampagnekoden og oppref med en værdi (oppref sætter OpenAI selv på)."));
         gc.appendChild(g1); gc.appendChild(g4);
       } else {
         g1.appendChild(h("h2", null, "Sådan i Google Ads"));

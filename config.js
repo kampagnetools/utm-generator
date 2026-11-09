@@ -9,6 +9,7 @@ var CHANNELS = [
   { v: "linkedin", t: "LinkedIn", d: "Opslag, annonce", social: true },
   { v: "google-ads", t: "Google Ads", d: "Søg, Display, YouTube", gads: true },
   { v: "microsoft-ads", t: "Microsoft Ads", d: "Bing, Microsoft-netværket", gads: true, ms: true },
+  { v: "openai", t: "OpenAI Ads", d: "Annoncer i ChatGPT", gads: true, oai: true },
   { v: "display", t: "Display og andet købt", d: "Bannere, video, podcast, native", display: true },
   { v: "sfmc", t: "SFMC", d: "Mail fra Marketing Cloud", medium: "email" },
   { v: "print", t: "Print og outdoor", d: "Brev, Journalen, outdoor, avisannonce", print: true },
@@ -72,7 +73,7 @@ var FORMATS = {
   printPaid: [
     { v: "politiken", t: "Politiken" }, { v: "jyllandsposten", t: "Jyllands-Posten" },
     { v: "information", t: "Information" }, { v: "weekendavisen", t: "Weekendavisen" },
-    { v: "kristeligt-dagblad", t: "Kristeligt Dagblad" },
+    { v: "kristeligt-dagblad", t: "Kristeligt Dagblad" }, { v: "bogmagasinet", t: "Bogmagasinet" },
     { v: "__other", t: "Andet medie", d: "Skriv navnet" }
   ],
   internal: [{ v: "banner", t: "Banner" }, { v: "popup", t: "Popup" }]
@@ -81,5 +82,17 @@ var CAMPAIGNS = [
   { v: "evergreen", t: "Nej", d: "Almindeligt indhold" },
   { v: "eoy2026", t: "eoy2026", d: "End of Year 2026" }
 ];
+
+// Kampagnekoder til gavebevis (valgfrit beløb) pr. kampagne og kanal.
+// Udfyldes automatisk i feltet Kampagnekode gavebevis og kan rettes.
+// meta = betalt Facebook/Instagram, search = Google og Microsoft Ads, openai = OpenAI Ads,
+// print: medie_print (annonce) eller medie_indstik.
+var GIFT_CODES = {
+  eoy2026: {
+    meta: "4328", search: "4329", openai: "4337",
+    politiken_print: "4330", information_print: "4331", "kristeligt-dagblad_print": "4332", bogmagasinet_print: "4333",
+    politiken_indstik: "4334", information_indstik: "4335", "kristeligt-dagblad_indstik": "4336"
+  }
+};
 
 var DEFAULT_CODE_ONE = "2822", DEFAULT_CODE_FP = "2824", DEFAULT_CODE_GIFT = "2472";

@@ -405,7 +405,7 @@
         gc.appendChild(g1); gc.appendChild(g2);
       } else {
         g1.appendChild(h("h2", null, "Sådan i Google Ads"));
-        g1.appendChild(h("p", "sub", "Kampagne > Indstillinger > Indstillinger for kampagnewebadresse > Endelig webadresse-suffiks. Virker for Søg, Display, YouTube, Demand Gen og PMax."));
+        g1.appendChild(h("p", "sub", "Kampagne > Indstillinger > Indstillinger for kampagnewebadresse > Endelig webadresse-suffiks. Virker for Søg, Display, YouTube og Demand Gen."));
         var g3 = h("div"); g3.appendChild(h("h2", null, "Tjek"));
         g3.appendChild(h("p", "sub", "Automatisk tagging er slået til. Der står ingen utm_-koder i suffikser eller sporingsskabeloner."));
         gc.appendChild(g1); gc.appendChild(g3);

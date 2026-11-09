@@ -18,7 +18,7 @@
     var fp = digits(s.codeFp) || (isEmail() ? DEFAULT_CODE_FP : "");
     if (one) e.campaign_code = one;
     if (fp) e.campaign_code_recurring = fp;
-    var gift = digits(s.codeGift) || (isEmail() ? DEFAULT_CODE_GIFT : "");
+    var gift = digits(s.codeGift);
     if (gift) e.utm_campaign_code = gift;
     return e;
   }
@@ -324,7 +324,7 @@
 
       if (st === "codes" && !s.mode) {
         stage.appendChild(h("h1", null, "Kampagnekoder"));
-        stage.appendChild(h("p", "sub", isEmail() ? "Udfyld dem, der skal med. Tomme felter får standardkoden." : "Udfyld dem, der skal med. Tomme felter kommer ikke med i linket."));
+        stage.appendChild(h("p", "sub", isEmail() ? "Udfyld dem, der skal med. Tomme felter til One-off og Feltpartner får standardkoden." : "Udfyld dem, der skal med. Tomme felter kommer ikke med i linket."));
         var fk = h("div", "form");
         var warn = h("p", "err"); warn.hidden = true;
         var nk = h("button", "go", "Videre"); nk.type = "button";
@@ -332,7 +332,7 @@
         var warned = false;
         function resetWarn() { warned = false; warn.hidden = true; nb.hidden = true; nk.textContent = "Videre"; }
         // Spørg én gang, før vi går videre:
-        // Marketing Cloud: One-off eller Feltpartner er tom, så standardkoden bruges.
+        // SFMC: One-off eller Feltpartner er tom, så standardkoden bruges.
         // Andre kanaler: ingen koder overhovedet.
         function submitCodes() {
           var msg = "";
@@ -353,7 +353,7 @@
         }
         fk.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; resetWarn(); }, 4, isEmail() ? "Hvis ingen valgt: " + DEFAULT_CODE_ONE : "Indtast kampagnekode", submitCodes));
         fk.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; resetWarn(); }, 4, isEmail() ? "Hvis ingen valgt: " + DEFAULT_CODE_FP : "Indtast kampagnekode", submitCodes));
-        fk.appendChild(numField("codeGift", "Kampagnekode gavebevis", function () { return s.codeGift; }, function (v) { s.codeGift = v; resetWarn(); }, 4, isEmail() ? "Hvis ingen valgt: " + DEFAULT_CODE_GIFT : "Hvis ingen valgt, kommer den ikke med", submitCodes));
+        fk.appendChild(numField("codeGift", "Kampagnekode gavebevis", function () { return s.codeGift; }, function (v) { s.codeGift = v; resetWarn(); }, 4, "Hvis ingen valgt, kommer den ikke med", submitCodes));
         fk.appendChild(warn);
         var ka = h("div", "actions");
         nk.addEventListener("click", submitCodes);

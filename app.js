@@ -352,11 +352,18 @@
         stage.appendChild(h("h1", null, "Kampagnekoder"));
         stage.appendChild(h("p", "sub", isEmail() ? "Udfyld dem, der skal med. Tomme felter til One-off og Feltpartner får standardkoden." : "Udfyld dem, der skal med. Tomme felter kommer ikke med i linket."));
         var fk = h("div", "form");
-        var warn = h("p", "err"); warn.hidden = true;
         var nk = h("button", "go", "Videre"); nk.type = "button";
-        var nb = h("button", "small", "Tilbage til koderne"); nb.type = "button"; nb.hidden = true;
+        // Overlay, når koder mangler: man skal vælge Udfyld koder eller Fortsæt
+        var ov = h("div", "overlay"); ov.hidden = true;
+        var box = h("div", "confirm"); box.setAttribute("role", "alertdialog"); box.setAttribute("aria-modal", "true");
+        var boxH = h("h2"), boxP = h("p"), boxA = h("div", "actions");
+        var nb = h("button", "go", "Udfyld koder"); nb.type = "button";
+        var yes = h("button", "small", "Fortsæt uden"); yes.type = "button";
+        boxA.appendChild(nb); boxA.appendChild(yes);
+        box.appendChild(boxH); box.appendChild(boxP); box.appendChild(boxA); ov.appendChild(box);
+        boxH.id = "confirmTitle"; box.setAttribute("aria-labelledby", "confirmTitle");
         var warned = false;
-        function resetWarn() { warned = false; warn.hidden = true; nb.hidden = true; nk.textContent = "Videre"; }
+        function resetWarn() { warned = false; ov.hidden = true; }
         // Spørg én gang, før vi går videre:
         // SFMC: One-off eller Feltpartner er tom, så standardkoden bruges.
         // Andre kanaler: ingen koder overhovedet.
@@ -371,8 +378,10 @@
             msg = "Du har hverken valgt kampagnekode One-off, Feltpartner eller gavebevis. Er du sikker på, at det er rigtigt?";
           }
           if (msg && !warned) {
-            warned = true; warn.hidden = false; nb.hidden = false; nk.textContent = "Ja, videre";
-            warn.textContent = msg;
+            warned = true; ov.hidden = false;
+            boxH.textContent = isEmail() ? "Standardkoder bruges" : "Ingen kampagnekoder";
+            boxP.textContent = msg;
+            nb.focus();
             return;
           }
           next();
@@ -381,12 +390,14 @@
         fk.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; resetWarn(); }, 4, isEmail() ? "Hvis ingen valgt: " + DEFAULT_CODE_FP : "Indtast kampagnekode", submitCodes));
         fk.appendChild(numField("codeGift", "Kampagnekode gavebevis", function () { return s.codeGift; }, function (v) { s.codeGift = v; s.giftEdited = true; resetWarn(); }, 4, "Hvis ingen valgt, kommer den ikke med", submitCodes));
         if (sug) fk.appendChild(h("p", "note", "Gavebeviskoden " + sug + " er udfyldt ud fra kampagne og kanal. Slet den, hvis den ikke skal med."));
-        fk.appendChild(warn);
-        var ka = h("div", "actions");
         nk.addEventListener("click", submitCodes);
-        nb.addEventListener("click", function () { resetWarn(); $("codeOne").focus(); });
-        ka.appendChild(nk); ka.appendChild(nb);
-        fk.appendChild(ka);
+        yes.addEventListener("click", next);
+        function fillIn() { resetWarn(); $("codeOne").focus(); }
+        nb.addEventListener("click", fillIn);
+        ov.addEventListener("click", function (e) { if (e.target === ov) fillIn(); });
+        ov.addEventListener("keydown", function (e) { if (e.key === "Escape") fillIn(); });
+        fk.appendChild(nk);
+        stage.appendChild(ov);
         stage.appendChild(fk);
         setTimeout(function () { var i = $("codeOne"); if (i) i.focus(); }, 0);
       }

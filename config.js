@@ -10,7 +10,7 @@ var CHANNELS = [
   { v: "google-ads", t: "Google Ads", d: "Søg, Display, YouTube", gads: true },
   { v: "microsoft-ads", t: "Microsoft Ads", d: "Bing, Microsoft-netværket", gads: true, ms: true },
   { v: "display", t: "Display og andet købt", d: "Bannere, video, podcast, native", display: true },
-  { v: "sfmc", t: "Marketing Cloud", d: "Mail fra SFMC", medium: "email" },
+  { v: "sfmc", t: "SFMC", d: "Mail fra Marketing Cloud", medium: "email" },
   { v: "print", t: "Print og outdoor", d: "Brev, Journalen, outdoor, avisannonce", print: true },
   { v: "msf-web", t: "MSF.DK", d: "Banner, popup", medium: "internal" }
 ];

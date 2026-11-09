@@ -107,6 +107,16 @@ h1 { margin: 0; font-weight: 500; font-size: clamp(34px, 5vw, 60px); line-height
 .parts dd { margin: 0; word-break: break-all; }
 .adscode { font: 15px/1.6 var(--f-mono); letter-spacing: 0; word-break: break-all; margin: 8px 0 0; }
 
+.overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px;
+  background: rgba(0, 0, 0, .5); animation: fade .15s ease-out; }
+.overlay[hidden] { display: none; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.confirm { display: grid; gap: 16px; width: 100%; max-width: 520px; border-top: 4px solid var(--red); border-radius: 14px;
+  padding: 26px 26px 22px; background: var(--paper); box-shadow: 0 20px 60px rgba(0, 0, 0, .35); }
+.confirm h2 { margin: 0; font: 500 24px/1.2 var(--f); letter-spacing: -.015em; color: var(--ink); }
+.confirm p { margin: 0; font-size: 18px; color: var(--ink); max-width: 52ch; }
+.go[hidden] { display: none; }
+
 .back { color: var(--soft); font-size: 20px; justify-self: start; }
 .back:hover { color: var(--ink); }
 
@@ -225,7 +235,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     printPaid: [
       { v: "politiken", t: "Politiken" }, { v: "jyllandsposten", t: "Jyllands-Posten" },
       { v: "information", t: "Information" }, { v: "weekendavisen", t: "Weekendavisen" },
-      { v: "kristeligt-dagblad", t: "Kristeligt Dagblad" }, { v: "bogmagasinet", t: "Bogmagasinet" },
+      { v: "kristeligt-dagblad", t: "Kristeligt Dagblad" }, { v: "bogmagasinet", t: "Bogmagasinet", noInsert: true },
       { v: "__other", t: "Andet medie", d: "Skriv navnet" }
     ],
     internal: [{ v: "banner", t: "Banner" }, { v: "popup", t: "Popup" }]
@@ -281,6 +291,8 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     else if (isPrint() && s.paid && s.format && s.format !== "__other") key = s.format + (s.insert ? "_indstik" : "_print");
     return (key && list[key]) || "";
   }
+  // Medier uden indstik (noInsert i config.js) springer "Annonce eller indstik?" over og tæller som annonce
+  function noInsert() { var f = formats().filter(function (x) { return x.v === s.format; })[0]; return !!(f && f.noInsert); }
   function isAd() { return isSocial() && s.paid === true; }
   function amountsAllowed() { return isAd() || isGads() || isDisplay() || medium() === "email"; }
   var $ = function (id) { return document.getElementById(id); };
@@ -323,8 +335,8 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     return isEmail() ? (clean(s.mailCampaign) || null) : s.campaign;
   }
   function content() {
-    if (isEmail()) return null;
-    var t = clean(s.topic), base = isPrint() ? (s.paid ? (s.insert ? "indstik_" : "annonce_") + s.qr : s.qr) : s.format;
+    if (isEmail() || isPrint()) return null; // utm_content kun for digitale medier
+    var t = clean(s.topic), base = s.format;
     return base ? (t ? base + "_" + t : base) : null;
   }
 
@@ -333,10 +345,10 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     if (!s.channel || isSocial() || isPrint()) l.push("paid");
     if (!isEmail() && !isGads()) l.push("format");
     if (isDisplay()) l.push("source");
-    if (isPrint() && s.paid) l.push("insert");
+    if (isPrint() && s.paid && !noInsert()) l.push("insert");
     if (isPrint()) l.push("qr");
     l.push("campaign");
-    // Google, Microsoft og OpenAI Ads: ingen landingsside, kun et suffiks / Tracking parameters, kun et suffiks med koder
+    // Google, Microsoft og OpenAI Ads: ingen landingsside, kun et suffiks / Tracking parameters med koder
     if (isGads()) l.push("codes", "done");
     else l.push("codes", "url", "done");
     return l;
@@ -475,6 +487,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
     }
 
     if (st === "format") {
+      if (noInsert()) s.insert = false;
       var head = isDisplay() ? "Hvilken type annonce?" : isPrint() ? (s.paid ? "Hvilket medie?" : "Hvilken tryksag?") : "Hvad slags " + (isSocial() ? (s.paid ? "annonce" : "opslag") : "indhold") + "?";
       stage.appendChild(h("h1", null, head));
       var l3 = h("div", "list");
@@ -598,11 +611,18 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         stage.appendChild(h("h1", null, "Kampagnekoder"));
         stage.appendChild(h("p", "sub", isEmail() ? "Udfyld dem, der skal med. Tomme felter til One-off og Feltpartner får standardkoden." : "Udfyld dem, der skal med. Tomme felter kommer ikke med i linket."));
         var fk = h("div", "form");
-        var warn = h("p", "err"); warn.hidden = true;
         var nk = h("button", "go", "Videre"); nk.type = "button";
-        var nb = h("button", "small", "Tilbage til koderne"); nb.type = "button"; nb.hidden = true;
+        // Overlay, når koder mangler: man skal vælge Udfyld koder eller Fortsæt
+        var ov = h("div", "overlay"); ov.hidden = true;
+        var box = h("div", "confirm"); box.setAttribute("role", "alertdialog"); box.setAttribute("aria-modal", "true");
+        var boxH = h("h2"), boxP = h("p"), boxA = h("div", "actions");
+        var nb = h("button", "go", "Udfyld koder"); nb.type = "button";
+        var yes = h("button", "small", "Fortsæt uden"); yes.type = "button";
+        boxA.appendChild(nb); boxA.appendChild(yes);
+        box.appendChild(boxH); box.appendChild(boxP); box.appendChild(boxA); ov.appendChild(box);
+        boxH.id = "confirmTitle"; box.setAttribute("aria-labelledby", "confirmTitle");
         var warned = false;
-        function resetWarn() { warned = false; warn.hidden = true; nb.hidden = true; nk.textContent = "Videre"; }
+        function resetWarn() { warned = false; ov.hidden = true; }
         // Spørg én gang, før vi går videre:
         // SFMC: One-off eller Feltpartner er tom, så standardkoden bruges.
         // Andre kanaler: ingen koder overhovedet.
@@ -617,8 +637,10 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
             msg = "Du har hverken valgt kampagnekode One-off, Feltpartner eller gavebevis. Er du sikker på, at det er rigtigt?";
           }
           if (msg && !warned) {
-            warned = true; warn.hidden = false; nb.hidden = false; nk.textContent = "Ja, videre";
-            warn.textContent = msg;
+            warned = true; ov.hidden = false;
+            boxH.textContent = isEmail() ? "Standardkoder bruges" : "Ingen kampagnekoder";
+            boxP.textContent = msg;
+            nb.focus();
             return;
           }
           next();
@@ -627,12 +649,14 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         fk.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; resetWarn(); }, 4, isEmail() ? "Hvis ingen valgt: " + DEFAULT_CODE_FP : "Indtast kampagnekode", submitCodes));
         fk.appendChild(numField("codeGift", "Kampagnekode gavebevis", function () { return s.codeGift; }, function (v) { s.codeGift = v; s.giftEdited = true; resetWarn(); }, 4, "Hvis ingen valgt, kommer den ikke med", submitCodes));
         if (sug) fk.appendChild(h("p", "note", "Gavebeviskoden " + sug + " er udfyldt ud fra kampagne og kanal. Slet den, hvis den ikke skal med."));
-        fk.appendChild(warn);
-        var ka = h("div", "actions");
         nk.addEventListener("click", submitCodes);
-        nb.addEventListener("click", function () { resetWarn(); $("codeOne").focus(); });
-        ka.appendChild(nk); ka.appendChild(nb);
-        fk.appendChild(ka);
+        yes.addEventListener("click", next);
+        function fillIn() { resetWarn(); $("codeOne").focus(); }
+        nb.addEventListener("click", fillIn);
+        ov.addEventListener("click", function (e) { if (e.target === ov) fillIn(); });
+        ov.addEventListener("keydown", function (e) { if (e.key === "Escape") fillIn(); });
+        fk.appendChild(nk);
+        stage.appendChild(ov);
         stage.appendChild(fk);
         setTimeout(function () { var i = $("codeOne"); if (i) i.focus(); }, 0);
       }
@@ -664,7 +688,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
       t.addEventListener("input", function () { s[tkey] = t.value; });
       [u, t].forEach(function (el) { el.addEventListener("keydown", function (e) { if (e.key === "Enter" && !mk.disabled) submit(); }); });
       mk.addEventListener("click", submit);
-      fm2.appendChild(f1); if (mail || !isEmail()) fm2.appendChild(f2); fm2.appendChild(mk);
+      fm2.appendChild(f1); if (mail || (!isEmail() && !isPrint())) fm2.appendChild(f2); fm2.appendChild(mk);
       stage.appendChild(fm2);
       reset();
       setTimeout(function () { u.focus(); }, 0);
@@ -678,9 +702,9 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         gparts.push("utm_source=bing", "utm_medium=cpc", "utm_campaign=" + campaign(),
           "utm_content={AdGroup}", "utm_term={keyword}");
       } else if (isOai()) {
-        // OpenAI fylder selv {campaign_id}, {ad_group_id}, {ad_id} og klik-ID'et {oppref} ind
+        // OpenAI fylder selv {campaign_id}, {ad_group_id} og {ad_id} ind. oppref er reserveret: OpenAI sætter det selv på klikket
         gparts.push("utm_source=openai", "utm_medium=cpc", "utm_campaign=" + campaign(),
-          "utm_id={campaign_id}", "utm_content={ad_group_id}_{ad_id}", "oppref={oppref}");
+          "utm_id={campaign_id}", "utm_content={ad_group_id}_{ad_id}");
       }
       Object.keys(gcodes).forEach(function (k) { gparts.push(k + "=" + gcodes[k]); });
       var suffix = gparts.join("&");
@@ -690,7 +714,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         stage.appendChild(h("p", "sub", isMs()
           ? "Microsoft fylder selv annoncegruppe og søgeord ind i {AdGroup} og {keyword}."
           : isOai()
-          ? "OpenAI fylder selv kampagne, annoncegruppe, annonce og klik-ID ind i felterne i krøllede parenteser."
+          ? "OpenAI fylder selv kampagne, annoncegruppe og annonce ind i felterne i krøllede parenteser. Klik-ID'et oppref sætter OpenAI selv på."
           : "Ingen UTM-koder. Google Ads giver GA4 kilde og kampagne via auto-tagging."));
         var sline = codeLine(suffix, 0);
         stage.appendChild(sline);
@@ -715,7 +739,7 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--red); outli
         g1.appendChild(h("h2", null, "Sådan i OpenAI Ads Manager"));
         g1.appendChild(h("p", "sub", "Edit Campaign > Tracking parameters: erstat teksten med ovenstående. Gør feltet tomt på annoncegrupper og annoncer, så de arver fra kampagnen. Link på annoncen er kun landingssiden, f.eks. https://msf.dk/stoet/."));
         var g4 = h("div"); g4.appendChild(h("h2", null, "Andre koder til én annoncegruppe?"));
-        g4.appendChild(h("p", "sub", "Lav en ny tekst her og sæt den på den annoncegruppe. Test bagefter et klik: adressen skal have utm_campaign, kampagnekoden og oppref med en værdi."));
+        g4.appendChild(h("p", "sub", "Lav en ny tekst her og sæt den på den annoncegruppe. Test bagefter et klik: adressen skal have utm_campaign, kampagnekoden og oppref med en værdi (oppref sætter OpenAI selv på)."));
         gc.appendChild(g1); gc.appendChild(g4);
       } else {
         g1.appendChild(h("h2", null, "Sådan i Google Ads"));

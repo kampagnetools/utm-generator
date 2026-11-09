@@ -87,7 +87,7 @@
     if (isPrint() && s.paid) l.push("insert");
     if (isPrint()) l.push("qr");
     l.push("campaign");
-    // Google, Microsoft og OpenAI Ads: ingen landingsside, kun et suffiks / Tracking parameters, kun et suffiks med koder
+    // Google, Microsoft og OpenAI Ads: ingen landingsside, kun et suffiks / Tracking parameters med koder
     if (isGads()) l.push("codes", "done");
     else l.push("codes", "url", "done");
     return l;

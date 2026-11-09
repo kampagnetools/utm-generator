@@ -2,8 +2,8 @@
 (function () {
   var s = fresh();
   function fresh() {
-    return { channel: null, paid: null, format: null, other: "", sourceName: "", qr: null, campaign: null,
-      codeOne: "", codeFp: "", codeGift: "",
+    return { channel: null, paid: null, format: null, other: "", sourceName: "", qr: null, insert: null, campaign: null,
+      codeOne: "", codeFp: "", codeGift: "", giftEdited: false,
       useAmounts: null, amtOne: ["", "", ""], amtRec: ["", "", ""],
       url: "", topic: "", mailCampaign: "", step: 0, mode: null };
   }
@@ -22,6 +22,16 @@
     if (gift) e.utm_campaign_code = gift;
     return e;
   }
+  // Gavebeviskode ud fra kampagne og kanal (GIFT_CODES i config.js)
+  function giftSuggestion() {
+    var list = GIFT_CODES[s.campaign]; if (!list) return "";
+    var key = null;
+    if (isOai()) key = "openai";
+    else if (isGads()) key = "search";
+    else if (isAd() && (s.channel === "facebook" || s.channel === "instagram")) key = "meta";
+    else if (isPrint() && s.paid && s.format && s.format !== "__other") key = s.format + (s.insert ? "_indstik" : "_print");
+    return (key && list[key]) || "";
+  }
   function isAd() { return isSocial() && s.paid === true; }
   function amountsAllowed() { return isAd() || isGads() || isDisplay() || medium() === "email"; }
   var $ = function (id) { return document.getElementById(id); };
@@ -38,6 +48,7 @@
   function isGads() { var c = ch(); return !!(c && c.gads); }
   function isDisplay() { var c = ch(); return !!(c && c.display); }
   function isMs() { var c = ch(); return !!(c && c.ms); }
+  function isOai() { var c = ch(); return !!(c && c.oai); }
   function medium() {
     var c = ch(); if (!c) return null;
     if (c.social) return s.paid ? "paid-social" : "organic";
@@ -64,7 +75,7 @@
   }
   function content() {
     if (isEmail()) return null;
-    var t = clean(s.topic), base = isPrint() ? s.qr : s.format;
+    var t = clean(s.topic), base = isPrint() ? (s.paid ? (s.insert ? "indstik_" : "annonce_") + s.qr : s.qr) : s.format;
     return base ? (t ? base + "_" + t : base) : null;
   }
 
@@ -73,9 +84,10 @@
     if (!s.channel || isSocial() || isPrint()) l.push("paid");
     if (!isEmail() && !isGads()) l.push("format");
     if (isDisplay()) l.push("source");
+    if (isPrint() && s.paid) l.push("insert");
     if (isPrint()) l.push("qr");
     l.push("campaign");
-    // Google og Microsoft Ads: ingen landingsside, kun et suffiks med koder
+    // Google, Microsoft og OpenAI Ads: ingen landingsside, kun et suffiks / Tracking parameters, kun et suffiks med koder
     if (isGads()) l.push("codes", "done");
     else l.push("codes", "url", "done");
     return l;
@@ -116,6 +128,7 @@
       var f = formats().filter(function (x) { return x.v === s.format; })[0]; return f ? f.t : "";
     }
     if (key === "source") return clean(s.sourceName);
+    if (key === "insert") return s.insert ? "Indstik" : "Annonce";
     if (key === "qr") return s.qr === "qr" ? "QR-kode" : "Trykt link";
     if (key === "campaign") return s.campaign === "evergreen" ? "Ingen kampagne" : campaign();
     if (key === "amounts") {
@@ -159,7 +172,7 @@
       acts.appendChild(cp); acts.appendChild(ok);
     }
     var same = h("button", "small", "Samme kampagne, ny kanal"); same.type = "button";
-    same.addEventListener("click", function () { var keep = { campaign: s.campaign, codeOne: s.codeOne, codeFp: s.codeFp, codeGift: s.codeGift,
+    same.addEventListener("click", function () { var keep = { campaign: s.campaign, codeOne: s.codeOne, codeFp: s.codeFp, codeGift: s.codeGift, giftEdited: s.giftEdited,
       useAmounts: s.useAmounts, amtOne: s.amtOne.slice(), amtRec: s.amtRec.slice(), url: s.url, topic: s.topic, mailCampaign: s.mailCampaign }; s = fresh(); Object.assign(s, keep); draw(true); });
     var nw = h("button", "small", "Start forfra"); nw.type = "button";
     nw.addEventListener("click", function () { s = fresh(); draw(true); });
@@ -255,6 +268,14 @@
       setTimeout(function () { sin.focus(); }, 0);
     }
 
+    if (st === "insert") {
+      stage.appendChild(h("h1", null, "Annonce eller indstik?"));
+      var li = h("div", "list");
+      li.appendChild(opt({ t: "Annonce", d: "Trykt i avisen eller magasinet" }, s.insert === false, function () { s.insert = false; next(); }));
+      li.appendChild(opt({ t: "Indstik", d: "Løst ark lagt i avisen" }, s.insert === true, function () { s.insert = true; next(); }));
+      stage.appendChild(li);
+    }
+
     if (st === "qr") {
       stage.appendChild(h("h1", null, "Hvordan kommer folk ind på siden?"));
       var lq = h("div", "list");
@@ -323,6 +344,8 @@
       }
 
       if (st === "codes" && !s.mode) {
+        var sug = giftSuggestion();
+        if (!s.giftEdited) s.codeGift = sug;
         stage.appendChild(h("h1", null, "Kampagnekoder"));
         stage.appendChild(h("p", "sub", isEmail() ? "Udfyld dem, der skal med. Tomme felter til One-off og Feltpartner får standardkoden." : "Udfyld dem, der skal med. Tomme felter kommer ikke med i linket."));
         var fk = h("div", "form");
@@ -353,7 +376,8 @@
         }
         fk.appendChild(numField("codeOne", "Kampagnekode One-off", function () { return s.codeOne; }, function (v) { s.codeOne = v; resetWarn(); }, 4, isEmail() ? "Hvis ingen valgt: " + DEFAULT_CODE_ONE : "Indtast kampagnekode", submitCodes));
         fk.appendChild(numField("codeFp", "Kampagnekode Feltpartner", function () { return s.codeFp; }, function (v) { s.codeFp = v; resetWarn(); }, 4, isEmail() ? "Hvis ingen valgt: " + DEFAULT_CODE_FP : "Indtast kampagnekode", submitCodes));
-        fk.appendChild(numField("codeGift", "Kampagnekode gavebevis", function () { return s.codeGift; }, function (v) { s.codeGift = v; resetWarn(); }, 4, "Hvis ingen valgt, kommer den ikke med", submitCodes));
+        fk.appendChild(numField("codeGift", "Kampagnekode gavebevis", function () { return s.codeGift; }, function (v) { s.codeGift = v; s.giftEdited = true; resetWarn(); }, 4, "Hvis ingen valgt, kommer den ikke med", submitCodes));
+        if (sug) fk.appendChild(h("p", "note", "Gavebeviskoden " + sug + " er udfyldt ud fra kampagne og kanal. Slet den, hvis den ikke skal med."));
         fk.appendChild(warn);
         var ka = h("div", "actions");
         nk.addEventListener("click", submitCodes);
@@ -404,14 +428,20 @@
       if (isMs()) {
         gparts.push("utm_source=bing", "utm_medium=cpc", "utm_campaign=" + campaign(),
           "utm_content={AdGroup}", "utm_term={keyword}");
+      } else if (isOai()) {
+        // OpenAI fylder selv {campaign_id}, {ad_group_id}, {ad_id} og klik-ID'et {oppref} ind
+        gparts.push("utm_source=openai", "utm_medium=cpc", "utm_campaign=" + campaign(),
+          "utm_id={campaign_id}", "utm_content={ad_group_id}_{ad_id}", "oppref={oppref}");
       }
       Object.keys(gcodes).forEach(function (k) { gparts.push(k + "=" + gcodes[k]); });
       var suffix = gparts.join("&");
 
       if (suffix) {
-        stage.appendChild(h("h1", null, "Dit suffiks er klar."));
+        stage.appendChild(h("h1", null, isOai() ? "Dine Tracking parameters er klar." : "Dit suffiks er klar."));
         stage.appendChild(h("p", "sub", isMs()
           ? "Microsoft fylder selv annoncegruppe og søgeord ind i {AdGroup} og {keyword}."
+          : isOai()
+          ? "OpenAI fylder selv kampagne, annoncegruppe, annonce og klik-ID ind i felterne i krøllede parenteser."
           : "Ingen UTM-koder. Google Ads giver GA4 kilde og kampagne via auto-tagging."));
         var sline = codeLine(suffix, 0);
         stage.appendChild(sline);
@@ -432,6 +462,12 @@
         var g2 = h("div"); g2.appendChild(h("h2", null, "Tjek kontoindstillinger > Auto-tagging"));
         g2.appendChild(h("p", "sub", "Microsoft Click ID (msclkid): slået til. UTM-tags: Erstat ikke eksisterende UTM-tags."));
         gc.appendChild(g1); gc.appendChild(g2);
+      } else if (isOai()) {
+        g1.appendChild(h("h2", null, "Sådan i OpenAI Ads Manager"));
+        g1.appendChild(h("p", "sub", "Edit Campaign > Tracking parameters: erstat teksten med ovenstående. Gør feltet tomt på annoncegrupper og annoncer, så de arver fra kampagnen. Link på annoncen er kun landingssiden, f.eks. https://msf.dk/stoet/."));
+        var g4 = h("div"); g4.appendChild(h("h2", null, "Andre koder til én annoncegruppe?"));
+        g4.appendChild(h("p", "sub", "Lav en ny tekst her og sæt den på den annoncegruppe. Test bagefter et klik: adressen skal have utm_campaign, kampagnekoden og oppref med en værdi."));
+        gc.appendChild(g1); gc.appendChild(g4);
       } else {
         g1.appendChild(h("h2", null, "Sådan i Google Ads"));
         g1.appendChild(h("p", "sub", "Kampagne > Indstillinger > Indstillinger for kampagnewebadresse > Endelig webadresse-suffiks. Virker for Søg, Display, YouTube og Demand Gen."));
